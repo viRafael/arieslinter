@@ -1,0 +1,9 @@
+add file checkstyle.xml 
+
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE module PUBLIC "-//Puppy Crawl//DTD Check Configuration 1.3//EN" "http://checkstyle.sourceforge.net/dtds/configuration_1_3.dtd">
+<module name="Checker">
+    <module name="TreeWalker">
+        <module name="br.ufba.testsmells.checks.VerboseTestCheck" />
+    </module>
+</module>
