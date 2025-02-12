@@ -49,6 +49,9 @@ public class UnkwonFixtureCheck extends AbstractCheck {
             if("assertFalse".equals(ast.getFirstChild().getText())) {
                 assertCount++;
             }
+            if("assertNotEquals".equals(ast.getFirstChild().getText())) {
+                assertCount++;
+            }
         }
     }
 
