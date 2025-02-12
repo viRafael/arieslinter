@@ -1,0 +1,14 @@
+<project>
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>br.ufba</groupId>
+    <artifactId>ufba-testsmells-checkstyle-checks</artifactId>
+    <name>UFBA Checkstyle Checks</name>
+    <version>1.0</version>
+    <dependencies>
+        <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>10.21.2</version>
+        </dependency>
+    </dependencies>
+</project>
