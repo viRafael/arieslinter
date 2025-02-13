@@ -4,6 +4,7 @@
     <artifactId>ufba-testsmells-checkstyle-checks</artifactId>
     <name>UFBA Checkstyle Checks</name>
     <version>1.0</version>
+    
     <dependencies>
         <dependency>
             <groupId>com.puppycrawl.tools</groupId>
@@ -11,4 +12,10 @@
             <version>10.21.2</version>
         </dependency>
     </dependencies>
+
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+    </properties>
+
 </project>

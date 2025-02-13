@@ -34,7 +34,15 @@ public class UnkwonFixtureCheck extends AbstractCheck {
         if (ast.getType() == TokenTypes.METHOD_DEF && hasTestAnnotation) {
             // Reinicia o contador ao entrar em um novo método
             assertCount = 0;
-        } else if (ast.getType() == TokenTypes.LITERAL_ASSERT) {
+        
+        // CÓDIGO ABAIXO RETIRA A NECESSIDADE DE VERIFICAR CADA TIPO DE ASSERT
+        // TODO:  testar se o código de fato funciona
+
+        // } else if ("assert".equals(ast.getFirstChild().getText().substring(0, 6))) {
+        //     assertCount++;
+        // }    
+        
+        } else if (ast.getType() == TokenTypes.LITERAL_ASSERT) { 
             assertCount++;
         } else if (ast.getType() == TokenTypes.METHOD_CALL) {
             if("assert".equals(ast.getFirstChild().getText())) {
@@ -60,7 +68,7 @@ public class UnkwonFixtureCheck extends AbstractCheck {
         boolean hasTestAnnotation = hasAnnotation(ast, "Test");
 
         if (ast.getType() == TokenTypes.METHOD_DEF && hasTestAnnotation) {
-            // Quando sair de um método, verifica se há chamadas 'assert'
+            // Quando sair de um métodos, verifica se há chamadas 'assert'
             if (assertCount == 0) {
                 log(ast.getLineNo()+1, "Número de chamadas 'assert' é ZERO ");
             }
