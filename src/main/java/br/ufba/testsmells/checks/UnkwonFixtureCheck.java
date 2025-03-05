@@ -38,7 +38,7 @@ public class UnkwonFixtureCheck extends AbstractCheck {
         // CÓDIGO ABAIXO RETIRA A NECESSIDADE DE VERIFICAR CADA TIPO DE ASSERT
         // TODO:  testar se o código de fato funciona
 
-        // } else if ("assert".equals(ast.getFirstChild().getText().substring(0, 6))) {
+        // } else if ("assert".equals(ast.getFirstChild().getText().startsWith("assert"))) {
         //     assertCount++;
         // }    
         
