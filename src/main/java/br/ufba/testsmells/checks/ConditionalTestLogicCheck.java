@@ -7,6 +7,9 @@ import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
 @StatelessCheck
 public class ConditionalTestLogicCheck extends AbstractCheck {
+
+    // TODO: TESTAR CLASSE ConditionalTestLogicCheck
+
     // Lista de tokens para estruturas condicionais/iterativas
     private static final int[] CONDITIONAL_TOKENS = {
             TokenTypes.LITERAL_IF,

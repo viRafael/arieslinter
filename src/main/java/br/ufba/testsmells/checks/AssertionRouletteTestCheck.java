@@ -12,6 +12,9 @@ import java.util.Map;
 
 @StatelessCheck
 public class AssertionRouletteTestCheck extends AbstractCheck {
+
+    // TODO: TESTAR CLASSE AssertionRouletteTestCheck
+
     @Override
     public int[] getAcceptableTokens() {
         return new int[] { TokenTypes.METHOD_DEF };
