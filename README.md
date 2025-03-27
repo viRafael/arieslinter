@@ -25,6 +25,8 @@ add file checkstyle.xml
 
 ---
 
+vscode plugin -> "Checkstyle for Java"
+
 configuração settings.xml - VSCODE
 
 "java.checkstyle.configuration": "/home/tassio/Desenvolvimento/repo.git/jnose-core/checkstyle.xml",
