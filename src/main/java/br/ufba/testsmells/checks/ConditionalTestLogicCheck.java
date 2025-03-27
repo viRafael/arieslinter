@@ -7,9 +7,6 @@ import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
 @StatelessCheck
 public class ConditionalTestLogicCheck extends AbstractCheck {
-
-    // TODO: TESTAR CLASSE ConditionalTestLogicCheck
-
     // Lista de tokens para estruturas condicionais/iterativas
     private static final int[] CONDITIONAL_TOKENS = {
             TokenTypes.LITERAL_IF,
@@ -38,7 +35,7 @@ public class ConditionalTestLogicCheck extends AbstractCheck {
     @Override
     public void visitToken(DetailAST ast) {
         if (hasAnnotation(ast, "Test") && containsConditionalLogic(ast)) {
-            log(ast.getLineNo(), "Teste contém lógica condicional complexa");
+            log(ast.getLineNo(), "Conditional Test Logic detected: test contains complex conditional logic");
         }
     }
 
