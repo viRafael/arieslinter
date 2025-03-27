@@ -41,7 +41,7 @@ public class VerboseTestCheck extends AbstractCheck {
             // Calcula o número de linhas no método
             int methodLength = endLine - startLine + 1;
             if (methodLength > max) {
-                log(startLine, "Método muito longo com " + methodLength);
+                log(startLine, "Verbose Test detected: method with " + methodLength + " lines.");
             }
         }
     }
@@ -49,7 +49,6 @@ public class VerboseTestCheck extends AbstractCheck {
     public void setMax(int max) {
         this.max = max;
     }
-
 
     private String getMethodName(DetailAST methodAst) {
         DetailAST ident = methodAst.findFirstToken(TokenTypes.IDENT);
