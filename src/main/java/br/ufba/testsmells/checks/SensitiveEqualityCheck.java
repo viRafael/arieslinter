@@ -55,7 +55,7 @@ public class SensitiveEqualityCheck extends AbstractCheck {
         String methodName = getMethodName(methodCall);
         if ("toString".equals(methodName)) {
             log(methodCall.getLineNo(),
-                    "Sensitive Equality detectado.");
+                    "Sensitive Equality detected: do not use toString()");
         }
     }
 
