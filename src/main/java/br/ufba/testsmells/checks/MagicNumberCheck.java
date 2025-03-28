@@ -8,8 +8,6 @@ import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 import java.util.HashSet;
 import java.util.Set;
 
-    // TODO: TESTAR CLASSE MagicNumberCheck
-
 @StatelessCheck
 public class MagicNumberCheck extends AbstractCheck {
     private final Set<Double> allowedNumbers = new HashSet<>();
@@ -48,7 +46,7 @@ public class MagicNumberCheck extends AbstractCheck {
         }
 
         if (isInTestMethod(ast) && isInMethodArgumentOrAssert(ast)) {
-            log(ast.getLineNo(), "Magic number detected: " + ast.getText());
+            log(ast.getLineNo(), "Magic number detected: use a variable with a self-expanatory name");
         }
     }
 
@@ -78,7 +76,7 @@ public class MagicNumberCheck extends AbstractCheck {
         while (parent != null) {
             if (parent.getType() == TokenTypes.VARIABLE_DEF) {
                 DetailAST modifiers = parent.findFirstToken(TokenTypes.MODIFIERS);
-                if (modifiers != null) {
+                if (modifiers != null) {    
                     // Usar LITERAL_STATIC e LITERAL_FINAL
                     boolean isStatic = modifiers.findFirstToken(TokenTypes.LITERAL_STATIC) != null;
                     boolean isFinal = modifiers.findFirstToken(TokenTypes.FINAL) != null;
@@ -144,4 +142,4 @@ public class MagicNumberCheck extends AbstractCheck {
         }
         return false;
     }
-}
+}   
