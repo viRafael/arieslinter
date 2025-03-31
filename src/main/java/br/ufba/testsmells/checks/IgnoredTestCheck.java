@@ -29,7 +29,7 @@ public class IgnoredTestCheck extends AbstractCheck {
     public void visitToken(DetailAST ast) {
         if (hasAnnotation(ast, "Ignore")) {
             String elementType = ast.getType() == TokenTypes.CLASS_DEF ? "Classe" : "Método";
-            log(ast.getLineNo(), elementType + " de teste ignorado detectado (@Ignore)");
+            log(ast.getLineNo(), "Ignored test detected: " + elementType + "  with @Ignore");
         }
     }
 

@@ -4,23 +4,12 @@ import com.puppycrawl.tools.checkstyle.StatelessCheck;
 import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
-
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-
-    // TODO: TESTAR CLASSE RedundantPrintCheck
-// Caso para teste
-//        @Test
-//        public void testValid() {
-//            logger.info("Log válido"); // Não reporta
-//        }
+import java.util.*;
 
 @StatelessCheck
 public class RedundantPrintCheck extends AbstractCheck {
-    private static final Set<String> PRINT_METHODS = new HashSet<>(
-            Arrays.asList("print", "println", "printf", "write")
-    );
+    private Set<String> forbiddenMethodNames = new HashSet<>(Arrays.asList("print", "println", "printf", "write"));
+    private Set<String> forbiddenQualifiers = new HashSet<>(Arrays.asList("System.out", "System.err"));
 
     @Override
     public int[] getAcceptableTokens() {
@@ -39,63 +28,76 @@ public class RedundantPrintCheck extends AbstractCheck {
 
     @Override
     public void visitToken(DetailAST ast) {
-        if (hasAnnotation(ast, "Test")) {
-            checkForPrintStatements(ast);
+        if (!hasAnnotation(ast, "Test")) return;
+
+        DetailAST methodBody = ast.findFirstToken(TokenTypes.SLIST);
+        if (methodBody != null) {
+            checkForPrintStatements(methodBody);
         }
     }
 
-    private void checkForPrintStatements(DetailAST methodAst) {
-        DetailAST slist = methodAst.findFirstToken(TokenTypes.SLIST);
-        if (slist != null) {
-            scanForPrintCalls(slist);
-        }
-    }
+    private void checkForPrintStatements(DetailAST node) {
+        DetailAST current = node.getFirstChild();
 
-    private void scanForPrintCalls(DetailAST node) {
-        DetailAST child = node.getFirstChild();
-
-        while (child != null) {
-            if (child.getType() == TokenTypes.METHOD_CALL) {
-                processMethodCall(child);
+        while (current != null) {
+            if (current.getType() == TokenTypes.METHOD_CALL) {
+                String methodName = getMethodName(current);
+                String qualifier = getQualifier(current);
+    
+                boolean isForbidden = (methodName != null && forbiddenMethodNames.contains(methodName)) || 
+                                     (qualifier != null && forbiddenQualifiers.contains(qualifier));
+    
+                if (isForbidden) {
+                    log(current.getLineNo(), "Redundant Print detected: method ''{0}'', remove it", 
+                        methodName != null ? methodName : qualifier);
+                }
             }
-            scanForPrintCalls(child); // Busca recursiva
-
-            child = child.getNextSibling();
+            if (current.hasChildren()) {
+                checkForPrintStatements(current);
+            }
+            current = current.getNextSibling();
         }
     }
 
-    private void processMethodCall(DetailAST methodCall) {
-        String methodName = getMethodName(methodCall);
-        String target = getMethodTarget(methodCall);
-
-        if (isSystemOutOrErr(target) && PRINT_METHODS.contains(methodName)) {
-            log(methodCall.getLineNo(),
-                    "Redundant Print detectado: " + target + "." + methodName);
+    private String getMethodName(DetailAST methodCallAst) {
+        DetailAST dotOrIdent = methodCallAst.getFirstChild();
+        if (dotOrIdent == null) return null;
+    
+        if (dotOrIdent.getType() == TokenTypes.DOT) {
+            DetailAST methodNameNode = dotOrIdent.getLastChild();
+            return methodNameNode != null ? methodNameNode.getText() : null;
+        } else if (dotOrIdent.getType() == TokenTypes.IDENT) {
+            return dotOrIdent.getText();
         }
+        
+        return null;
     }
 
-    private String getMethodName(DetailAST methodCall) {
-        DetailAST dot = methodCall.findFirstToken(TokenTypes.DOT);
-        if (dot != null && dot.getLastChild().getType() == TokenTypes.IDENT) {
-            return dot.getLastChild().getText();
+    private String getQualifier(DetailAST methodCallAst) {
+        DetailAST dotOrIdent = methodCallAst.getFirstChild();
+        if (dotOrIdent == null || dotOrIdent.getType() != TokenTypes.DOT) return null;
+    
+        List<String> parts = new ArrayList<>();
+        DetailAST current = dotOrIdent;
+        while (current != null && current.getType() == TokenTypes.DOT) {
+            DetailAST lastChild = current.getLastChild();
+            if (lastChild != null) {
+                parts.add(lastChild.getText());
+            }
+            current = current.getFirstChild();
         }
-        return "";
-    }
-
-    private String getMethodTarget(DetailAST methodCall) {
-        DetailAST dot = methodCall.findFirstToken(TokenTypes.DOT);
-        if (dot != null) {
-            // System.out.println → "System.out"
-            return dot.getFirstChild().getText();
+        
+        if (current != null) {
+            parts.add(current.getText());
         }
-        return "";
+        
+        Collections.reverse(parts);
+        return parts.size() > 1 ? 
+               String.join(".", parts.subList(0, parts.size() - 1)) : // Remove o método
+               null;
     }
 
-    private boolean isSystemOutOrErr(String target) {
-        return target.equals("System.out") || target.equals("System.err");
-    }
-
-    // Métodu auxiliar
+    // Métodu Auxiliar
     private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
         DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
         if (modifiers != null) {

@@ -34,14 +34,17 @@ public class VerboseTestCheck extends AbstractCheck {
     public void visitToken(DetailAST ast) {
         DetailAST slist = ast.findFirstToken(TokenTypes.SLIST);
         boolean hasTestAnnotation = hasAnnotation(ast, "Test");
+
         if (slist != null && hasTestAnnotation == true) {
             // Encontra a chave de fechamento '}' (último filho do SLIST)
             int startLine = slist.getLineNo(); // Linha inicial (abertura '{')
             int endLine = slist.getLastChild().getLineNo(); // Linha final (fechamento '}')
+
             // Calcula o número de linhas no método
             int methodLength = endLine - startLine + 1;
             if (methodLength > max) {
                 log(startLine, "Verbose Test detected: method with " + methodLength + " lines.");
+
             }
         }
     }
@@ -50,18 +53,14 @@ public class VerboseTestCheck extends AbstractCheck {
         this.max = max;
     }
 
-    private String getMethodName(DetailAST methodAst) {
-        DetailAST ident = methodAst.findFirstToken(TokenTypes.IDENT);
-        return ident != null ? ident.getText() : "";
-    }
-
-
     private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
         DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
+
         if (modifiers != null) {
             for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
                 if (child.getType() == TokenTypes.ANNOTATION) {
                     DetailAST annotationIdent = child.findFirstToken(TokenTypes.IDENT);
+                    
                     if (annotationIdent != null && annotationIdent.getText().equals(annotationName)) {
                         return true;
                     }

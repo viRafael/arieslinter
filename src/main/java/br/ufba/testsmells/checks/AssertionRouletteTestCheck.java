@@ -57,10 +57,12 @@ public class AssertionRouletteTestCheck extends AbstractCheck {
             while (child != null) {
                 if (child.getType() == TokenTypes.EXPR) {
                     DetailAST methodCall = child.getFirstChild();
+                    
                     if (methodCall != null && methodCall.getType() == TokenTypes.METHOD_CALL) {
                         processMethodCall(methodCall, asserts);
                     }
                 }
+
                 child = child.getNextSibling();
             }
         }
@@ -69,6 +71,7 @@ public class AssertionRouletteTestCheck extends AbstractCheck {
 
     private void processMethodCall(DetailAST methodCall, List<AssertInfo> asserts) {
         String methodName = methodCall.findFirstToken(TokenTypes.IDENT).getText();
+
         if (methodName.startsWith("assert")) {
             String message = extractMessage(methodCall);
             asserts.add(new AssertInfo(message, methodCall.getLineNo()));
@@ -89,12 +92,6 @@ public class AssertionRouletteTestCheck extends AbstractCheck {
     private void checkAssertionRoulette(List<AssertInfo> asserts) {
         if (asserts.size() < 2) return;
 
-        // Verifica asserts sem mensagem
-        long noMessageCount = asserts.stream().filter(a -> a.message == null).count();
-        if (noMessageCount >= 2) {
-            log(asserts.get(0).line, "Múltiplos asserts sem mensagem descritiva");
-        }
-
         // Verifica mensagens duplicadas
         Map<String, List<Integer>> messageMap = new HashMap<>();
         for (AssertInfo assertInfo : asserts) {
@@ -107,10 +104,16 @@ public class AssertionRouletteTestCheck extends AbstractCheck {
         for (Map.Entry<String, List<Integer>> entry : messageMap.entrySet()) {
             if (entry.getValue().size() >= 2) {
                 entry.getValue().forEach(line ->
-                        log(line, "Mensagem duplicada em assert: " + entry.getKey()));
+                        log(line, "Assertion Roulette detected: duplicate message"));
             }
         }
-    }
+
+        // Verifica asserts sem mensagem
+        long noMessageCount = asserts.stream().filter(a -> a.message == null).count();
+        if (noMessageCount >= 2) {
+            log(asserts.get(0).line, "Assertion Roulette detected: without message");
+        }
+    }       
 
     // Métodu auxiliar
     private boolean hasAnnotation(DetailAST methodAst, String annotationName) {

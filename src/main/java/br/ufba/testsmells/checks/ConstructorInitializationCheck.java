@@ -4,8 +4,11 @@ import com.puppycrawl.tools.checkstyle.StatelessCheck;
 import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Arrays;
 
-    // TODO: TESTAR CLASSE ConstructorInitializationCheck
+   // TODO: TESTAR CLASSE ConstructorInitializationCheck
 
 //// Caso 1: Classe de Teste com Construtor Explícito → DEVE REPORTAR (Linha 3)
 //    public class CalculatorTest {
@@ -63,10 +66,12 @@ import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
 @StatelessCheck
 public class ConstructorInitializationCheck extends AbstractCheck {
+    private Set<String> allowedClasses = new HashSet<>(Arrays.asList("ArrayList", "HashMap")); // Exemplos permitidos
+    private boolean ignoreTestFrameworkClasses = true; // Ignora classes como Mockito/JUnit
 
     @Override
     public int[] getAcceptableTokens() {
-        return new int[] { TokenTypes.CLASS_DEF };
+        return new int[] { TokenTypes.METHOD_DEF };
     }
 
     @Override
@@ -81,56 +86,48 @@ public class ConstructorInitializationCheck extends AbstractCheck {
 
     @Override
     public void visitToken(DetailAST ast) {
-        // Obtém o nome da classe
-        DetailAST classIdent = ast.findFirstToken(TokenTypes.IDENT);
-        if (classIdent == null) return;
-        String className = classIdent.getText();
+        if (!hasAnnotation(ast, "Test")) return;
 
-        // Verifica se é uma classe de teste (possui métodos @Test)
-        if (!isTestClass(ast)) return;
-
-        // Procura por construtores na classe
-        checkForConstructors(ast, className);
+        DetailAST methodBody = ast.findFirstToken(TokenTypes.SLIST);
+        if (methodBody != null) {
+            checkForConstructorCalls(methodBody);
+        }
     }
 
-    private boolean isTestClass(DetailAST classAst) {
-        DetailAST objBlock = classAst.findFirstToken(TokenTypes.OBJBLOCK);
-        if (objBlock == null) return false;
+    private void checkForConstructorCalls(DetailAST node) {
+        DetailAST current = node.getFirstChild();
 
-        // Verifica se há pelo menos um métodu com @Test
-        DetailAST method = objBlock.getFirstChild();
-        while (method != null) {
-            if (method.getType() == TokenTypes.METHOD_DEF && hasAnnotation(method, "Test")) {
-                return true;
+        while (current != null) {
+            if (current.getType() == TokenTypes.LITERAL_NEW) {
+                String className = extractClassName(current);
+                if (!isAllowed(className)) {
+                    log(current.getLineNo(), "Constructor Initialization detected: Chamada ao construtor ''{0}'' no método de teste", className);
+                }
             }
-            method = method.getNextSibling();
-        }
-        return false;
-    }
 
-    private void checkForConstructors(DetailAST classAst, String className) {
-        DetailAST objBlock = classAst.findFirstToken(TokenTypes.OBJBLOCK);
-        if (objBlock == null) return;
-
-        DetailAST method = objBlock.getFirstChild();
-        while (method != null) {
-            if (method.getType() == TokenTypes.METHOD_DEF) {
-                processMethod(method, className);
+            // Verifica filhos recursivamente
+            if (current.hasChildren()) {    
+                checkForConstructorCalls(current);
             }
-            method = method.getNextSibling();
+
+            current = current.getNextSibling();
         }
     }
 
-    private void processMethod(DetailAST methodDef, String className) {
-        // Obtém nome do métodu
-        DetailAST methodIdent = methodDef.findFirstToken(TokenTypes.IDENT);
-        String methodName = methodIdent.getText();
-
-        // Verifica se é um construtor (nome igual ao da classe)
-        if (methodName.equals(className)) {
-            log(methodDef.getLineNo(),
-                    "Constructor Initialization detectado. Utilize o setUp()");
+    private String extractClassName(DetailAST newToken) {
+        DetailAST type = newToken.getFirstChild();
+        if (type.getType() == TokenTypes.IDENT) {
+            return type.getText();
+        } else if (type.getType() == TokenTypes.DOT) { // Para classes qualificadas (ex: new com.example.MyClass())
+            return type.getLastChild().getText();
         }
+        return "-1";
+    }
+
+    private boolean isAllowed(String className) {
+        // Permite classes configuradas ou do framework de teste
+        return allowedClasses.contains(className) || 
+               (ignoreTestFrameworkClasses && className.matches("^(Mock|Test|Assert|Matchers).*"));
     }
 
     // Métodu auxiliar

@@ -70,7 +70,7 @@ public class UnkwonFixtureCheck extends AbstractCheck {
         if (ast.getType() == TokenTypes.METHOD_DEF && hasTestAnnotation) {
             // Quando sair de um métodos, verifica se há chamadas 'assert'
             if (assertCount == 0) {
-                log(ast.getLineNo()+1, "Número de chamadas 'assert' é ZERO ");
+                log(ast.getLineNo()+1, "Unknown Test detected: without assertions");
             }
         }
     }

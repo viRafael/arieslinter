@@ -28,7 +28,7 @@ public class SensitiveEqualityCheck extends AbstractCheck {
     @Override
     public void visitToken(DetailAST ast) {
         if (hasAnnotation(ast, "Test")) {
-            checkForToStringCalls(ast);
+            checkForToStringCalls(ast); 
         }
     }
 

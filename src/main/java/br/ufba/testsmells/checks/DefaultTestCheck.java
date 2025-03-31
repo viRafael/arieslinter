@@ -9,8 +9,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.Arrays;
 
-    // TODO: TESTAR CLASSE DefaultTestCheck
-
 @StatelessCheck
 public class DefaultTestCheck extends AbstractCheck {
     private Set<String> forbiddenClassNames = new HashSet<>(Arrays.asList("ExampleUnitTest"
@@ -35,12 +33,13 @@ public class DefaultTestCheck extends AbstractCheck {
     public void visitToken(DetailAST ast) {
         // Obtém o nome da classe
         DetailAST ident = ast.findFirstToken(TokenTypes.IDENT);
+
         if (ident != null) {
             String className = ident.getText();
 
             // Verifica se o nome está na lista de proibidos
             if (forbiddenClassNames.contains(className)) {
-                log(ast.getLineNo(), "Default Test detectado.", className);
+                log(ast.getLineNo(), "Default Test detected: rename the class ", className);
             }
         }
     }

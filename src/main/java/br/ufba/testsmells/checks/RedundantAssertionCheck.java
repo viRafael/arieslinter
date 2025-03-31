@@ -56,6 +56,7 @@ public class RedundantAssertionCheck extends AbstractCheck {
                         processMethodCall(methodCall);
                     }
                 }
+                
                 child = child.getNextSibling();
             }
         }
@@ -80,9 +81,10 @@ public class RedundantAssertionCheck extends AbstractCheck {
         for (int i = 0; i < params.size(); i++) {
             for (int j = i + 1; j < params.size(); j++) {
                 if (params.get(i).getText().equals(params.get(j).getText())) {
-                    String paramValue = params.get(i).getText();
+                    //String paramValue = params.get(i).getText();
                     log(methodCall.getLineNo(),
-                            "Assert redundante em '" + methodName + "': parâmetros idênticos (" + paramValue + ")");
+                            // "Assert redundante em '" + methodName + "': parâmetros idênticos (" + paramValue + ")");
+                            "Redundant Assertion deteced: refactoring ou remove it");
                     return; // Reporta apenas uma vez por assert
                 }
             }

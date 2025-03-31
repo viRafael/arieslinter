@@ -60,6 +60,8 @@ public class DuplicateAssertCheck extends AbstractCheck {
                         processAssertCall(methodCall, assertSignatures);
                     }
                 }
+                checkDuplicateAsserts(methodAst); // Busca Recursiva
+
                 child = child.getNextSibling();
             }
         }
@@ -76,7 +78,7 @@ public class DuplicateAssertCheck extends AbstractCheck {
         assertSignatures.merge(signature, 1, Integer::sum);
 
         if (assertSignatures.get(signature) == 2) {
-            log(methodCall.getLineNo(), "Assert duplicado: " + signature);
+            log(methodCall.getLineNo(), "Duplicate Assert deteced: " + signature + ", remove one");
         }
     }
 

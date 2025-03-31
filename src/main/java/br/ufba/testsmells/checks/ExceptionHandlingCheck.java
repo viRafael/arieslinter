@@ -5,24 +5,6 @@ import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
-    // TODO: TESTAR CLASSE ExceptionHandlingCheck
-//    @Test
-//    public void testInvalidInput() {
-//        try {  // ← Detecta LITERAL_CATCH
-//            service.process(null);
-//            fail();
-//        } catch (IllegalArgumentException e) {
-//            // Deveria usar @Test(expected) ou assertThrows
-//        }
-//    }
-//
-//            @Test
-//            public void testException() {
-//                if (true) {
-//                    throw new RuntimeException();  // ← Detecta LITERAL_THROW
-//                }
-//            }
-
 @StatelessCheck
 public class ExceptionHandlingCheck extends AbstractCheck {
     private boolean allowThrow = false;  // Permite configurar via XML se deseja ignorar throw
@@ -54,7 +36,7 @@ public class ExceptionHandlingCheck extends AbstractCheck {
         boolean hasCatch = containsCatchClause(methodBody);
 
         if ((!allowThrow && hasThrow) || (!allowCatch && hasCatch)) {
-            log(ast.getLineNo(), "Exception Handling detectado: Use a manipulação de exceções do JUnit em vez de throw/catch manual");
+            log(ast.getLineNo(), "Exception Handling detected: Use JUnit exception handling instead of manual throw/catch");
         }
     }
 
@@ -65,8 +47,7 @@ public class ExceptionHandlingCheck extends AbstractCheck {
     private boolean containsCatchClause(DetailAST node) {
         return scanForToken(node, TokenTypes.LITERAL_CATCH);
     }
-
-    // TODO: Obersar se esse teste está correto
+            
     private boolean scanForToken(DetailAST node, int tokenType) {
         DetailAST current = node.getFirstChild();
 

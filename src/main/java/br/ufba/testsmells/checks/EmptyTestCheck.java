@@ -9,24 +9,6 @@ import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 public class EmptyTestCheck extends AbstractCheck {
 
     // TODO: TESTAR CLASSE EmptyTestCheck
-    // Exemplos para teste:
-//    @Test
-//    public void testEmpty() {}
-//
-//    @Test
-//    public void testWithComments() {
-//        // Este é um comentário
-//    }
-//
-//    @Test
-//    public void testValid() {
-//        assertEquals(2, 1 + 1);
-//    }
-//
-//    @Test
-//    public void testWithSemi() {
-//        ;
-//    }
 
     @Override
     public int[] getAcceptableTokens() {
@@ -47,9 +29,9 @@ public class EmptyTestCheck extends AbstractCheck {
     public void visitToken(DetailAST ast) {
         DetailAST slist = ast.findFirstToken(TokenTypes.SLIST);
 
-        if (slist != null && hasAnnotation(ast, "Test")) {
+        if (hasAnnotation(ast, "Test")) {
             if (isEmptyMethodBody(slist)) {
-                log(ast.getLineNo(), "Empty Test detectado");
+                log(ast.getLineNo(), "Empty Test detected: delete it or write the test"); 
             }
         }
     }
