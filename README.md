@@ -55,7 +55,7 @@ add in your settings.xml - VSCODE
 "java.checkstyle.modules": ["/home/{user}/.m2/repository/br/ufba/arieslinter/1.0/arieslinter-1.0.jar"],
 ```
 
-replace the "{user}" with your user name in your system.
+replace the "{user}" with your user name in your system. Ex. /home/tassio/
 
 ---
 ## For IntelliJ
