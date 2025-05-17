@@ -50,13 +50,12 @@ Add the VSCode plugin "Checkstyle for Java"
 add in your settings.xml - VSCODE
 
 ```
-"java.checkstyle.configuration": "{path_of_the_file}/checkstyle.xml",
+"java.checkstyle.configuration": "${workspaceFolder}/checkstyle.xml",
 "java.checkstyle.autocheck": true,
 "java.checkstyle.modules": ["/home/{user}/.m2/repository/br/ufba/arieslinter/1.0/arieslinter-1.0.jar"],
 ```
 
-replace the "{path_of_the_file}" with the path of the file checkstyle.xml in your project root directory. 
-and replace the "{user}" with your user name in your system.
+replace the "{user}" with your user name in your system.
 
 ---
 ## For IntelliJ
