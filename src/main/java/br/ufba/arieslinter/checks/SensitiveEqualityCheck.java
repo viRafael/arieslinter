@@ -1,14 +1,14 @@
-package br.ufba.testsmells.checks;
+package br.ufba.arieslinter.checks;
 
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
 import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
-@StatelessCheck
-public class EmptyTestCheck extends AbstractCheck {
+    // TODO: TESTAR CLASSE SensitiveEqualityCheck
 
-    // TODO: TESTAR CLASSE EmptyTestCheck
+@StatelessCheck
+public class SensitiveEqualityCheck extends AbstractCheck {
 
     @Override
     public int[] getAcceptableTokens() {
@@ -27,30 +27,49 @@ public class EmptyTestCheck extends AbstractCheck {
 
     @Override
     public void visitToken(DetailAST ast) {
-        DetailAST slist = ast.findFirstToken(TokenTypes.SLIST);
-
         if (hasAnnotation(ast, "Test")) {
-            if (isEmptyMethodBody(slist)) {
-                log(ast.getLineNo(), "Empty Test detected: delete it or write the test"); 
-            }
+            checkForToStringCalls(ast); 
         }
     }
 
-    private boolean isEmptyMethodBody(DetailAST slist) {
-        DetailAST child = slist.getFirstChild();
+    private void checkForToStringCalls(DetailAST methodAst) {
+        DetailAST slist = methodAst.findFirstToken(TokenTypes.SLIST);
+        if (slist != null) {
+            scanForMethodCalls(slist);
+        }
+    }
 
-        // Percorre todos os nós filhos do SLIST
+    private void scanForMethodCalls(DetailAST node) {
+        DetailAST child = node.getFirstChild();
         while (child != null) {
-            // Ignora ponto-e-vírgula vazios (ex: { ; })
-            if (child.getType() != TokenTypes.SEMI) {
-                return false;
+            if (child.getType() == TokenTypes.METHOD_CALL) {
+                processMethodCall(child);
             }
+            scanForMethodCalls(child); // Busca recursiva
+
             child = child.getNextSibling();
         }
-        return true;
     }
 
-    // Métodu Auxiliar
+    private void processMethodCall(DetailAST methodCall) {
+        String methodName = getMethodName(methodCall);
+        if ("toString".equals(methodName)) {
+            log(methodCall.getLineNo(),
+                    "Sensitive Equality detected: do not use toString()");
+        }
+    }
+
+    private String getMethodName(DetailAST methodCall) {
+        DetailAST dot = methodCall.findFirstToken(TokenTypes.DOT);
+        if (dot != null) {
+            return dot.getLastChild().getText(); // Ex: obj.toString() → "toString"
+        }
+
+        DetailAST ident = methodCall.findFirstToken(TokenTypes.IDENT);
+        return ident != null ? ident.getText() : "";
+    }
+
+    // Métodu auxiliar
     private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
         DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
         if (modifiers != null) {

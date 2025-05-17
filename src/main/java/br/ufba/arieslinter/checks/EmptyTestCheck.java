@@ -1,18 +1,18 @@
-package br.ufba.testsmells.checks;
+package br.ufba.arieslinter.checks;
 
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
 import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
-    // TODO: TESTAR CLASSE IgnoredTestCheck
-
 @StatelessCheck
-public class IgnoredTestCheck extends AbstractCheck {
+public class EmptyTestCheck extends AbstractCheck {
+
+    // TODO: TESTAR CLASSE EmptyTestCheck
+
     @Override
     public int[] getAcceptableTokens() {
-        // Monitora classes e métodos
-        return new int[] { TokenTypes.CLASS_DEF, TokenTypes.METHOD_DEF };
+        return new int[] { TokenTypes.METHOD_DEF };
     }
 
     @Override
@@ -27,15 +27,32 @@ public class IgnoredTestCheck extends AbstractCheck {
 
     @Override
     public void visitToken(DetailAST ast) {
-        if (hasAnnotation(ast, "Ignore")) {
-            String elementType = ast.getType() == TokenTypes.CLASS_DEF ? "Classe" : "Método";
-            log(ast.getLineNo(), "Ignored test detected: " + elementType + "  with @Ignore");
+        DetailAST slist = ast.findFirstToken(TokenTypes.SLIST);
+
+        if (hasAnnotation(ast, "Test")) {
+            if (isEmptyMethodBody(slist)) {
+                log(ast.getLineNo(), "Empty Test detected: delete it or write the test"); 
+            }
         }
     }
 
-    // Métodu auxiliar
-    private boolean hasAnnotation(DetailAST ast, String annotationName) {
-        DetailAST modifiers = ast.findFirstToken(TokenTypes.MODIFIERS);
+    private boolean isEmptyMethodBody(DetailAST slist) {
+        DetailAST child = slist.getFirstChild();
+
+        // Percorre todos os nós filhos do SLIST
+        while (child != null) {
+            // Ignora ponto-e-vírgula vazios (ex: { ; })
+            if (child.getType() != TokenTypes.SEMI) {
+                return false;
+            }
+            child = child.getNextSibling();
+        }
+        return true;
+    }
+
+    // Métodu Auxiliar
+    private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
+        DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
         if (modifiers != null) {
             for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
                 if (child.getType() == TokenTypes.ANNOTATION) {

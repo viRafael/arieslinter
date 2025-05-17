@@ -1,4 +1,4 @@
-package br.ufba.testsmells.checks;
+package br.ufba.arieslinter.checks;
 
 import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;

@@ -5,7 +5,7 @@ add file checkstyle.xml
 <!DOCTYPE module PUBLIC "-//Puppy Crawl//DTD Check Configuration 1.3//EN" "http://checkstyle.sourceforge.net/dtds/configuration_1_3.dtd">
 <module name="Checker">
     <module name="TreeWalker">
-        <module name="br.ufba.testsmells.checks.VerboseTestCheck" />
+        <module name="br.ufba.arieslinter.checks.VerboseTestCheck" />
     </module>
 </module>
 ```
@@ -19,7 +19,7 @@ add file checkstyle.xml
         <module name="br.ufba.testsmells.checks.VerboseTestCheck" />
         <module name="br.ufba.testsmells.checks.UnknownFixtureCheck" />
         <module name="br.ufba.testsmells.checks.SleepyTestCheck" />
-        <!-- <module name="br.ufba.testsmells.checks.DuplicateAssertCheck" /> -->
+        <!-- <module name="br.ufba.arieslinter.checks.DuplicateAssertCheck" /> -->
     </module>
 </module>
 

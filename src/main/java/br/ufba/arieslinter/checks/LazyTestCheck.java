@@ -1,4 +1,4 @@
-package br.ufba.testsmells.checks;
+package br.ufba.arieslinter.checks;
 
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
 import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
@@ -10,15 +10,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-    //TODO: TESTAR CLASSE DependentTestCheck
-// Funciona de um forma limitada devido as nuanceas da natureza do Dependente Test
-// Ele verifica dentro de uma classe de teste se um teste chama outro teste
+    //TODO: TESTAR CLASSE LazyTestCheck
 
 @StatelessCheck
-public class DependentTestCheck extends AbstractCheck {
+public class LazyTestCheck extends AbstractCheck {
     private String currentClass;
-    private final Map<String, Set<String>> classTestMethods = new HashMap<>();
-    private final Map<String, Set<String>> testDependencies = new HashMap<>();
+    private Map<String, Set<String>> classMethodCalls = new HashMap<>();
 
     @Override
     public int[] getAcceptableTokens() {
@@ -37,8 +34,7 @@ public class DependentTestCheck extends AbstractCheck {
 
     @Override
     public void beginTree(DetailAST rootAST) {
-        classTestMethods.clear();
-        testDependencies.clear();
+        classMethodCalls.clear();
         currentClass = null;
     }
 
@@ -46,63 +42,69 @@ public class DependentTestCheck extends AbstractCheck {
     public void visitToken(DetailAST ast) {
         if (ast.getType() == TokenTypes.CLASS_DEF) {
             currentClass = ast.findFirstToken(TokenTypes.IDENT).getText();
-            classTestMethods.put(currentClass, new HashSet<>());
-        } else if (ast.getType() == TokenTypes.METHOD_DEF) {
-            processMethod(ast);
+            classMethodCalls.put(currentClass, new HashSet<>());
+        } else if (ast.getType() == TokenTypes.METHOD_DEF && hasAnnotation(ast, "Test")) {
+            processTestMethod(ast);
         }
     }
 
-    private void processMethod(DetailAST methodAst) {
-        if (hasAnnotation(methodAst, "Test")) {
-            String methodName = methodAst.findFirstToken(TokenTypes.IDENT).getText();
-            classTestMethods.get(currentClass).add(methodName);
-            analyzeMethodBody(methodAst, methodName);
-        }
-    }
-
-    private void analyzeMethodBody(DetailAST methodAst, String currentTestMethod) {
-        Set<String> dependencies = new HashSet<>();
+    private void processTestMethod(DetailAST methodAst) {
+        Set<String> calledMethods = new HashSet<>();
         DetailAST slist = methodAst.findFirstToken(TokenTypes.SLIST);
         if (slist != null) {
-            findMethodCalls(slist, dependencies);
+            findMethodCalls(slist, calledMethods);
         }
-        testDependencies.put(currentTestMethod, dependencies);
+        classMethodCalls.get(currentClass).addAll(calledMethods);
     }
 
-    private void findMethodCalls(DetailAST node, Set<String> dependencies) {
+    private void findMethodCalls(DetailAST node, Set<String> calledMethods) {
         DetailAST child = node.getFirstChild();
+
         while (child != null) {
             if (child.getType() == TokenTypes.METHOD_CALL) {
-                String calledMethod = getMethodName(child);
-                if (classTestMethods.get(currentClass).contains(calledMethod)) {
-                    dependencies.add(calledMethod);
+                String methodName = getFullMethodName(child);
+                if (!isExcludedMethod(methodName)) {
+                    calledMethods.add(methodName);
                 }
             }
-            findMethodCalls(child, dependencies);
+            findMethodCalls(child, calledMethods);
             child = child.getNextSibling();
         }
     }
 
-    private String getMethodName(DetailAST methodCall) {
+    private String getFullMethodName(DetailAST methodCall) {
         DetailAST dot = methodCall.findFirstToken(TokenTypes.DOT);
         if (dot != null) {
-            return dot.getLastChild().getText();
+            return dot.getFirstChild().getText() + "." + dot.getLastChild().getText();
         }
         return methodCall.findFirstToken(TokenTypes.IDENT).getText();
+    }
+
+    private boolean isExcludedMethod(String methodName) {
+        // Ignora métodos de assert e framework de teste
+        return methodName.startsWith("assert") ||
+                methodName.startsWith("fail") ||
+                methodName.contains(".getClass()");
     }
 
     @Override
     public void leaveToken(DetailAST ast) {
         if (ast.getType() == TokenTypes.CLASS_DEF) {
-            reportDependencies();
+            checkForLazyTestPattern();
             currentClass = null;
         }
     }
 
-    private void reportDependencies() {
-        for (Map.Entry<String, Set<String>> entry : testDependencies.entrySet()) {
-            for (String dependency : entry.getValue()) {
-                log(0, "Dependent Test detectado: '" + entry.getKey() + "' depende de '" + dependency + "'");
+    private void checkForLazyTestPattern() {
+        Map<String, Integer> methodCount = new HashMap<>();
+        for (String method : classMethodCalls.get(currentClass)) {
+            methodCount.put(method, methodCount.getOrDefault(method, 0) + 1);
+        }
+
+        for (Map.Entry<String, Integer> entry : methodCount.entrySet()) {
+            if (entry.getValue() > 1) {
+                log(0, "Lazy Test detectado: '" + entry.getKey() +
+                        "' chamado em múltiplos testes. Considere refatorar para evitar duplicação.");
             }
         }
     }
