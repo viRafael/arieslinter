@@ -67,6 +67,20 @@ replace the "{user}" with your user name in your system. Ex. /home/tassio/
 ---
 ## For IntelliJ
 
+Add the plugin "CheckStyle-IDEA" in your Intellij.
+https://plugins.jetbrains.com/plugin/1065-checkstyle-idea
+
+In the windows settings:
+Settings -> Tools -> Checkstyle
+
+in "Configuration File" add "+":
+- Description: Arieslinter
+- User a local Checkstyle file: your_path_checkstyle.xml
+- Scan Scope: All files in project
+
+in "Third-Party Checks" add "+":
+- path: you_path_for_arieslinter-1.0.jar       ex: /home/user/.m2/repository/br/ufba/arieslinter/1.0/arieslinter-1.0.jar
+
 
 
 ---
