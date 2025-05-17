@@ -57,3 +57,13 @@ add in your settings.xml - VSCODE
 
 replace the "{path_of_the_file}" with the path of the file checkstyle.xml in your project root directory. 
 and replace the "{user}" with your user name in your system.
+
+---
+## For IntelliJ
+
+
+
+---
+## For Eclipse
+
+
