@@ -28,14 +28,21 @@ add file checkstyle.xml in your project root directory.
 
 ```
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE module PUBLIC "-//Puppy Crawl//DTD Check Configuration 1.3//EN" "http://checkstyle.sourceforge.net/dtds/configuration_1_3.dtd">
+<!DOCTYPE module PUBLIC "-//Puppy Crawl//DTD Check Configuration 1.3//EN"
+        "http://checkstyle.sourceforge.net/dtds/configuration_1_3.dtd">
 
 <module name="Checker">
     <module name="TreeWalker">
-        <module name="br.ufba.arieslinter.checks.VerboseTestCheck" />
-        <module name="br.ufba.arieslinter.checks.UnknownFixtureCheck" />
-        <module name="br.ufba.arieslinter.checks.SleepyTestCheck" />
-        <!-- <module name="br.ufba.arieslinter.checks.DuplicateAssertCheck" /> -->
+        <module name="br.ufba.arieslinter.checks.ConditionalTestLogicCheck"/>
+        <module name="br.ufba.arieslinter.checks.DefaultTestCheck"/>
+        <module name="br.ufba.arieslinter.checks.ExceptionHandlingCheck"/>
+        <module name="br.ufba.arieslinter.checks.IgnoredTestCheck"/>
+        <module name="br.ufba.arieslinter.checks.MagicNumberCheck"/>
+        <module name="br.ufba.arieslinter.checks.RedundantPrintCheck"/>
+        <module name="br.ufba.arieslinter.checks.SensitiveEqualityCheck"/>
+        <module name="br.ufba.arieslinter.checks.SleepyTestCheck"/>
+        <module name="br.ufba.arieslinter.checks.UnkwonFixtureCheck"/>
+        <module name="br.ufba.arieslinter.checks.VerboseTestCheck"/>
     </module>
 </module>
 ```
