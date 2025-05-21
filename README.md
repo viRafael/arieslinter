@@ -4,7 +4,7 @@ This is a repository for the project Arieslinter.
 
 First, you need to install the Arieslinter in your local maven repository:
 ```
-git clone https://github.com/tassiovirginio/arieslinter.git
+git clone https://github.com/viRafael/arieslinter.git
 
 cd arieslinter
 
@@ -52,7 +52,7 @@ add in your settings.xml - VSCODE
 "java.checkstyle.modules": ["/home/{user}/.m2/repository/br/ufba/arieslinter/1.0/arieslinter-1.0.jar"],
 ```
 
-replace the "{user}" with your user name in your system. Ex. /home/tassio/
+replace the "{user}" with your user name in your system. Ex. /home/rafael/
 
 ---
 ## For IntelliJ
@@ -72,8 +72,5 @@ in "Third-Party Checks" add "+":
 - path: you_path_for_arieslinter-1.0.jar       ex: /home/user/.m2/repository/br/ufba/arieslinter/1.0/arieslinter-1.0.jar
 
 
-
----
-## For Eclipse
 
 
