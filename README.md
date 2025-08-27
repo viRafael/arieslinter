@@ -71,6 +71,11 @@ in "Configuration File" add "+":
 in "Third-Party Checks" add "+":
 - path: you_path_for_arieslinter-1.0.jar       ex: /home/user/.m2/repository/br/ufba/arieslinter/1.0/arieslinter-1.0.jar
 
+--- 
+## The PAPER
 
+An academic paper was produced describing the Arieslinter tool, detailing its functionalities, objectives, and application in detecting test smells in Java test code. This paper was accepted at CBSOFT 2025, highlighting the tool’s relevance and contribution to software quality research.
 
+The paper presents the concepts, the architecture of the linter, the implemented checks, and the results obtained from experiments with real-world projects.
 
+LINK TO PAPER IN GOOGLE DRIVE: https://drive.google.com/file/d/1_nEaDjkd1r3pkuUrF9rhxE6PONH51Z3q/view?usp=drive_link
