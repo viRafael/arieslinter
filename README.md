@@ -80,4 +80,4 @@ The paper presents the concepts, the architecture of the linter, the implemented
 
 LINK TO PAPER IN GOOGLE DRIVE: https://drive.google.com/file/d/1_nEaDjkd1r3pkuUrF9rhxE6PONH51Z3q/view?usp=drive_link
 
-LINK TO THE ARTIFACT IN ZENODO: https://zenodo.org/records/16748491
+LINK TO THE ARTIFACT IN ZENODO: https://zenodo.org/records/16998677
