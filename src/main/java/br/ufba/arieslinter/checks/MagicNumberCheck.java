@@ -5,19 +5,8 @@ import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
-import java.util.HashSet;
-import java.util.Set;
-
 @StatelessCheck
 public class MagicNumberCheck extends AbstractCheck {
-    private final Set<Double> allowedNumbers = new HashSet<>();
-
-    public MagicNumberCheck() {
-        // Valores permitidos por padrão (0, 1 e -1)
-        allowedNumbers.add(0.0);
-        allowedNumbers.add(1.0);
-        allowedNumbers.add(-1.0);
-    }
 
     @Override
     public int[] getAcceptableTokens() {
@@ -41,22 +30,12 @@ public class MagicNumberCheck extends AbstractCheck {
 
     @Override
     public void visitToken(DetailAST ast) {
-        if (isAllowed(ast) || isInStaticFinalField(ast) || isInAnnotation(ast)) {
+        if (isInStaticFinalField(ast) || isInAnnotation(ast)) {
             return;
         }
 
         if (isInTestMethod(ast) && isInMethodArgumentOrAssert(ast)) {
             log(ast.getLineNo(), "Magic number detected: use a variable with a self-expanatory name");
-        }
-    }
-
-    private boolean isAllowed(DetailAST ast) {
-        try {
-            String text = ast.getText().replaceAll("[LlFfDd]$", "");
-            double value = Double.parseDouble(text);
-            return allowedNumbers.contains(value);
-        } catch (NumberFormatException e) {
-            return false;
         }
     }
 
