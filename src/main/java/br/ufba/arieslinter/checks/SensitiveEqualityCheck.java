@@ -1,14 +1,24 @@
 package br.ufba.arieslinter.checks;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
 import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
-    // TODO: TESTAR CLASSE SensitiveEqualityCheck
-
 @StatelessCheck
 public class SensitiveEqualityCheck extends AbstractCheck {
+
+    // Anotações de teste conhecidas
+    private Set<String> testAnnotations = new HashSet<>(Arrays.asList(
+            "Test",
+            "ParameterizedTest",
+            "RepeatedTest",
+            "TestFactory",
+            "TestTemplate"));
 
     @Override
     public int[] getAcceptableTokens() {
@@ -27,8 +37,8 @@ public class SensitiveEqualityCheck extends AbstractCheck {
 
     @Override
     public void visitToken(DetailAST ast) {
-        if (hasAnnotation(ast, "Test")) {
-            checkForToStringCalls(ast); 
+        if (hasTestAnnotation(ast)) {
+            checkForToStringCalls(ast);
         }
     }
 
@@ -69,14 +79,14 @@ public class SensitiveEqualityCheck extends AbstractCheck {
         return ident != null ? ident.getText() : "";
     }
 
-    // Métodu auxiliar
-    private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
+    // Método Auxiliar - Corrigido para detectar múltiplas anotações de teste
+    private boolean hasTestAnnotation(DetailAST methodAst) {
         DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
         if (modifiers != null) {
             for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
                 if (child.getType() == TokenTypes.ANNOTATION) {
                     DetailAST annotationIdent = child.findFirstToken(TokenTypes.IDENT);
-                    if (annotationIdent != null && annotationIdent.getText().equals(annotationName)) {
+                    if (annotationIdent != null && testAnnotations.contains(annotationIdent.getText())) {
                         return true;
                     }
                 }
