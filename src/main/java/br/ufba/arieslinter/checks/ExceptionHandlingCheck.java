@@ -7,9 +7,6 @@ import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
 @StatelessCheck
 public class ExceptionHandlingCheck extends AbstractCheck {
-    private boolean allowThrow = false;  // Permite configurar via XML se deseja ignorar throw
-    private boolean allowCatch = false;  // Permite configurar via XML se deseja ignorar catch
-
     @Override
     public int[] getAcceptableTokens() {
         return new int[] { TokenTypes.METHOD_DEF };
@@ -35,7 +32,7 @@ public class ExceptionHandlingCheck extends AbstractCheck {
         boolean hasThrow = containsThrowStatement(methodBody);
         boolean hasCatch = containsCatchClause(methodBody);
 
-        if ((!allowThrow && hasThrow) || (!allowCatch && hasCatch)) {
+        if (hasThrow || hasCatch) {
             log(ast.getLineNo(), "Exception Handling detected: Use JUnit exception handling instead of manual throw/catch");
         }
     }
@@ -44,10 +41,60 @@ public class ExceptionHandlingCheck extends AbstractCheck {
         return scanForToken(node, TokenTypes.LITERAL_THROW);
     }
 
+    /**
+     * Verifica se há catch clause, EXCLUINDO try-with-resources.
+     * Try-with-resources é apenas para gerenciamento de recursos, não para exception handling.
+     */
     private boolean containsCatchClause(DetailAST node) {
-        return scanForToken(node, TokenTypes.LITERAL_CATCH);
+        DetailAST current = node.getFirstChild();
+
+        while (current != null) {
+            // Procura por blocos LITERAL_TRY
+            if (current.getType() == TokenTypes.LITERAL_TRY) {
+                // Verifica se NÃO é try-with-resources
+                if (!isTryWithResources(current)) {
+                    // Agora procura por LITERAL_CATCH dentro deste try
+                    if (hasCatchBlock(current)) {
+                        return true;
+                    }
+                }
+            }
+
+            // Recursão para filhos
+            if (current.hasChildren()) {
+                if (containsCatchClause(current)) {
+                    return true;
+                }
+            }
+
+            current = current.getNextSibling();
+        }
+
+        return false;
     }
-            
+
+    /**
+     * Verifica se um bloco TRY é try-with-resources.
+     * Try-with-resources tem um RESOURCE_SPECIFICATION como filho.
+     */
+    private boolean isTryWithResources(DetailAST tryNode) {
+        return tryNode.findFirstToken(TokenTypes.RESOURCE_SPECIFICATION) != null;
+    }
+
+    /**
+     * Verifica se um bloco TRY tem pelo menos um CATCH.
+     */
+    private boolean hasCatchBlock(DetailAST tryNode) {
+        DetailAST child = tryNode.getFirstChild();
+        while (child != null) {
+            if (child.getType() == TokenTypes.LITERAL_CATCH) {
+                return true;
+            }
+            child = child.getNextSibling();
+        }
+        return false;
+    }
+
     private boolean scanForToken(DetailAST node, int tokenType) {
         DetailAST current = node.getFirstChild();
 
@@ -67,16 +114,7 @@ public class ExceptionHandlingCheck extends AbstractCheck {
         return false;
     }
 
-    // Setters para configuração via XML
-    public void setAllowThrow(boolean allow) {
-        this.allowThrow = allow;
-    }
-
-    public void setAllowCatch(boolean allow) {
-        this.allowCatch = allow;
-    }
-
-    // Métodu Auxiliar
+    // Método Auxiliar
     private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
         DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
         if (modifiers != null) {
