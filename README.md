@@ -31,7 +31,7 @@ add file checkstyle.xml in your project root directory.
         <module name="br.ufba.arieslinter.checks.RedundantPrintCheck"/>
         <module name="br.ufba.arieslinter.checks.SensitiveEqualityCheck"/>
         <module name="br.ufba.arieslinter.checks.SleepyTestCheck"/>
-        <module name="br.ufba.arieslinter.checks.UnkwonFixtureCheck"/>
+        <module name="br.ufba.arieslinter.checks.UnknownFixtureCheck"/>
         <module name="br.ufba.arieslinter.checks.VerboseTestCheck"/>
     </module>
 </module>
