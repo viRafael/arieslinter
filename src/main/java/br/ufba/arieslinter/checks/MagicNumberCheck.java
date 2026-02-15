@@ -1,12 +1,14 @@
 package br.ufba.arieslinter.checks;
 
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
-import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
+import br.ufba.arieslinter.checks.abstracts.AbstractTestSmellCheck;
+import br.ufba.arieslinter.checks.constants.TestAnnotations;
+
 @StatelessCheck
-public class MagicNumberCheck extends AbstractCheck {
+public class MagicNumberCheck extends AbstractTestSmellCheck {
 
     @Override
     public int[] getAcceptableTokens() {
@@ -39,23 +41,12 @@ public class MagicNumberCheck extends AbstractCheck {
         }
     }
 
-    private DetailAST findParentMethod(DetailAST ast) {
-        DetailAST parent = ast.getParent();
-        while (parent != null) {
-            if (parent.getType() == TokenTypes.METHOD_DEF) {
-                return parent;
-            }
-            parent = parent.getParent();
-        }
-        return null;
-    }
-
     private boolean isInStaticFinalField(DetailAST ast) {
         DetailAST parent = ast.getParent();
         while (parent != null) {
             if (parent.getType() == TokenTypes.VARIABLE_DEF) {
                 DetailAST modifiers = parent.findFirstToken(TokenTypes.MODIFIERS);
-                if (modifiers != null) {    
+                if (modifiers != null) {
                     // Usar LITERAL_STATIC e LITERAL_FINAL
                     boolean isStatic = modifiers.findFirstToken(TokenTypes.LITERAL_STATIC) != null;
                     boolean isFinal = modifiers.findFirstToken(TokenTypes.FINAL) != null;
@@ -80,25 +71,9 @@ public class MagicNumberCheck extends AbstractCheck {
 
     private boolean isInTestMethod(DetailAST ast) {
         DetailAST methodDef = findParentMethod(ast);
-        return methodDef != null && hasAnnotation(methodDef, "Test");
+        return methodDef != null && hasAnyAnnotation(methodDef, TestAnnotations.ALL_TEST_ANNOTATIONS);
     }
 
-    private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
-        DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
-        if (modifiers != null) {
-            for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
-                if (child.getType() == TokenTypes.ANNOTATION) {
-                    DetailAST annotationIdent = child.findFirstToken(TokenTypes.IDENT);
-                    if (annotationIdent != null && annotationIdent.getText().equals(annotationName)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    // Novo métodu para verificar contexto de uso
     private boolean isInMethodArgumentOrAssert(DetailAST ast) {
         DetailAST parent = ast.getParent();
         while (parent != null) {
@@ -119,6 +94,7 @@ public class MagicNumberCheck extends AbstractCheck {
             }
             parent = parent.getParent();
         }
+        
         return false;
     }
-}   
+}

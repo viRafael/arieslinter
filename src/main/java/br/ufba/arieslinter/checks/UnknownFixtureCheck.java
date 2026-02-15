@@ -1,23 +1,18 @@
 package br.ufba.arieslinter.checks;
 
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
-import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
+import br.ufba.arieslinter.checks.abstracts.AbstractTestSmellCheck;
+import br.ufba.arieslinter.checks.constants.TestAnnotations;
+
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Arrays;
 
 @StatelessCheck
-public class UnknownFixtureCheck extends AbstractCheck {
+public class UnknownFixtureCheck extends AbstractTestSmellCheck {
     private int assertCount = 0;
-
-    private Set<String> testAnnotations = new HashSet<>(Arrays.asList(
-            "Test",
-            "ParameterizedTest",
-            "RepeatedTest",
-            "TestFactory",
-            "TestTemplate"));
 
     private Set<String> assertionMethods = new HashSet<>(Arrays.asList(
             "assert",
@@ -40,6 +35,11 @@ public class UnknownFixtureCheck extends AbstractCheck {
             "fail"));
 
     @Override
+    public int[] getAcceptableTokens() {
+        return new int[] { TokenTypes.METHOD_DEF, TokenTypes.LITERAL_ASSERT, TokenTypes.METHOD_CALL };
+    }
+
+    @Override
     public int[] getRequiredTokens() {
         return getAcceptableTokens();
     }
@@ -50,14 +50,9 @@ public class UnknownFixtureCheck extends AbstractCheck {
     }
 
     @Override
-    public int[] getAcceptableTokens() {
-        return new int[] { TokenTypes.METHOD_DEF, TokenTypes.LITERAL_ASSERT, TokenTypes.METHOD_CALL };
-    }
-
-    @Override
     public void visitToken(DetailAST ast) {
 
-        boolean hasTestAnnotation = hasTestAnnotation(ast);
+        boolean hasTestAnnotation = hasAnyAnnotation(ast, TestAnnotations.ALL_TEST_ANNOTATIONS);
 
         if (ast.getType() == TokenTypes.METHOD_DEF && hasTestAnnotation) {
             // Reinicia o contador ao entrar em um novo método
@@ -75,7 +70,7 @@ public class UnknownFixtureCheck extends AbstractCheck {
 
     @Override
     public void leaveToken(DetailAST ast) {
-        boolean hasTestAnnotation = hasTestAnnotation(ast);
+        boolean hasTestAnnotation = hasAnyAnnotation(ast, TestAnnotations.ALL_TEST_ANNOTATIONS);
 
         if (ast.getType() == TokenTypes.METHOD_DEF && hasTestAnnotation) {
             // Quando sair de um método, verifica se há chamadas 'assert'
@@ -85,7 +80,7 @@ public class UnknownFixtureCheck extends AbstractCheck {
         }
     }
 
-    private String getMethodName(DetailAST methodCallAst) {
+    protected String getMethodName(DetailAST methodCallAst) {
         DetailAST firstChild = methodCallAst.getFirstChild();
         if (firstChild == null)
             return null;
@@ -99,20 +94,5 @@ public class UnknownFixtureCheck extends AbstractCheck {
         }
 
         return null;
-    }
-
-    private boolean hasTestAnnotation(DetailAST methodAst) {
-        DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
-        if (modifiers != null) {
-            for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
-                if (child.getType() == TokenTypes.ANNOTATION) {
-                    DetailAST annotationIdent = child.findFirstToken(TokenTypes.IDENT);
-                    if (annotationIdent != null && testAnnotations.contains(annotationIdent.getText())) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 }

@@ -1,18 +1,19 @@
 package br.ufba.arieslinter.checks;
 
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
-import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
+
+import br.ufba.arieslinter.checks.abstracts.AbstractTestSmellCheck;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Arrays;
 
 @StatelessCheck
-public class DefaultTestCheck extends AbstractCheck {
-    private Set<String> forbiddenClassNames = new HashSet<>(Arrays.asList("ExampleUnitTest"
-            , "ExampleInstrumentedTest"));
+public class DefaultTestCheck extends AbstractTestSmellCheck {
+    private Set<String> forbiddenClassNames = new HashSet<>(
+            Arrays.asList("ExampleUnitTest", "ExampleInstrumentedTest"));
 
     @Override
     public int[] getAcceptableTokens() {
@@ -31,7 +32,6 @@ public class DefaultTestCheck extends AbstractCheck {
 
     @Override
     public void visitToken(DetailAST ast) {
-        // Obtém o nome da classe
         DetailAST ident = ast.findFirstToken(TokenTypes.IDENT);
 
         if (ident != null) {

@@ -1,23 +1,14 @@
 package br.ufba.arieslinter.checks;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
-import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
-@StatelessCheck
-public class ExceptionHandlingCheck extends AbstractCheck {
-    private Set<String> testAnnotations = new HashSet<>(Arrays.asList(
-            "Test",
-            "ParameterizedTest",
-            "RepeatedTest",
-            "TestFactory",
-            "TestTemplate"));
+import br.ufba.arieslinter.checks.abstracts.AbstractTestSmellCheck;
+import br.ufba.arieslinter.checks.constants.TestAnnotations;
 
+@StatelessCheck
+public class ExceptionHandlingCheck extends AbstractTestSmellCheck {
     @Override
     public int[] getAcceptableTokens() {
         return new int[] { TokenTypes.METHOD_DEF };
@@ -83,7 +74,7 @@ public class ExceptionHandlingCheck extends AbstractCheck {
             for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
                 if (child.getType() == TokenTypes.ANNOTATION) {
                     DetailAST annotationIdent = child.findFirstToken(TokenTypes.IDENT);
-                    if (annotationIdent != null && testAnnotations.contains(annotationIdent.getText())) {
+                    if (annotationIdent != null && TestAnnotations.ALL_TEST_ANNOTATIONS.contains(annotationIdent.getText())) {
                         return true;
                     }
                 }
