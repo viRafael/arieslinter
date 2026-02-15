@@ -42,10 +42,15 @@ public abstract class AbstractTestSmellCheck extends AbstractCheck {
     }
 
     protected String getMethodName(DetailAST methodCall) {
-        DetailAST firstChild = methodCall.getFirstChild();
-        if (firstChild.getType() == TokenTypes.DOT) {
-            return firstChild.getLastChild().getText();
+        DetailAST identNode = methodCall.findFirstToken(TokenTypes.IDENT);
+
+        if (identNode == null) {
+            DetailAST dotNode = methodCall.findFirstToken(TokenTypes.DOT);
+            if (dotNode != null) {
+                identNode = dotNode.getLastChild();
+            }
         }
-        return firstChild.getText();
+
+        return identNode != null ? identNode.getText() : null;
     }
 }
