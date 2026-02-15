@@ -121,69 +121,6 @@ public class RedundantAssertionCheck extends AbstractTestSmellCheck {
         return unwrapped;
     }
 
-    /**
-     * Verifica se o nó representa um valor real (não um separador).
-     */
-    private boolean isValueNode(DetailAST node) {
-        int type = node.getType();
-
-        // Literais
-        if (type == TokenTypes.LITERAL_TRUE ||
-                type == TokenTypes.LITERAL_FALSE ||
-                type == TokenTypes.LITERAL_NULL ||
-                type == TokenTypes.STRING_LITERAL ||
-                type == TokenTypes.NUM_INT ||
-                type == TokenTypes.NUM_LONG ||
-                type == TokenTypes.NUM_FLOAT ||
-                type == TokenTypes.NUM_DOUBLE) {
-            return true;
-        }
-
-        // Identificadores (variáveis)
-        if (type == TokenTypes.IDENT) {
-            return true;
-        }
-
-        // Chamadas de método
-        if (type == TokenTypes.METHOD_CALL) {
-            return true;
-        }
-
-        // Acessos a campos (obj.field)
-        if (type == TokenTypes.DOT) {
-            return true;
-        }
-
-        // New expressions
-        if (type == TokenTypes.LITERAL_NEW) {
-            return true;
-        }
-
-        // Expressões binárias/unárias
-        if (type == TokenTypes.PLUS || type == TokenTypes.MINUS ||
-                type == TokenTypes.STAR || type == TokenTypes.DIV ||
-                type == TokenTypes.MOD ||
-                type == TokenTypes.EQUAL || type == TokenTypes.NOT_EQUAL ||
-                type == TokenTypes.GT || type == TokenTypes.LT ||
-                type == TokenTypes.GE || type == TokenTypes.LE ||
-                type == TokenTypes.LOR || type == TokenTypes.LAND ||
-                type == TokenTypes.LNOT) {
-            return true;
-        }
-
-        // Lambda
-        if (type == TokenTypes.LAMBDA) {
-            return true;
-        }
-
-        // Arrays
-        if (type == TokenTypes.ARRAY_INIT) {
-            return true;
-        }
-
-        return false;
-    }
-
     private boolean checkRedundancy(String methodName, List<DetailAST> params) {
         // Assertions de igualdade - compara se os dois parâmetros são idênticos
         if (methodName.equals("assertEquals") ||
@@ -330,20 +267,43 @@ public class RedundantAssertionCheck extends AbstractTestSmellCheck {
         return params;
     }
 
-    protected String getMethodName(DetailAST methodCall) {
-        DetailAST identNode = methodCall.findFirstToken(TokenTypes.IDENT);
-
-        if (identNode == null) {
-            DetailAST dotNode = methodCall.findFirstToken(TokenTypes.DOT);
-            if (dotNode != null) {
-                identNode = dotNode.getLastChild();
-            }
-        }
-
-        return identNode != null ? identNode.getText() : null;
-    }
-
     private boolean isAssertionMethod(String methodName) {
         return methodName.startsWith("assert") || methodName.equals("fail");
+    }
+
+    /**
+     * Verifica se o nó representa um valor real (não um separador).
+     */
+    private boolean isValueNode(DetailAST node) {
+        int type = node.getType();
+
+        return type == TokenTypes.LITERAL_TRUE
+                || type == TokenTypes.LITERAL_FALSE
+                || type == TokenTypes.LITERAL_NULL
+                || type == TokenTypes.STRING_LITERAL
+                || type == TokenTypes.NUM_INT
+                || type == TokenTypes.NUM_LONG
+                || type == TokenTypes.NUM_FLOAT
+                || type == TokenTypes.NUM_DOUBLE
+                || type == TokenTypes.IDENT
+                || type == TokenTypes.METHOD_CALL
+                || type == TokenTypes.DOT
+                || type == TokenTypes.LITERAL_NEW
+                || type == TokenTypes.PLUS
+                || type == TokenTypes.MINUS
+                || type == TokenTypes.STAR
+                || type == TokenTypes.DIV
+                || type == TokenTypes.MOD
+                || type == TokenTypes.EQUAL
+                || type == TokenTypes.NOT_EQUAL
+                || type == TokenTypes.GT
+                || type == TokenTypes.LT
+                || type == TokenTypes.GE
+                || type == TokenTypes.LE
+                || type == TokenTypes.LOR
+                || type == TokenTypes.LAND
+                || type == TokenTypes.LNOT
+                || type == TokenTypes.LAMBDA
+                || type == TokenTypes.ARRAY_INIT;
     }
 }
