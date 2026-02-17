@@ -1,133 +1,130 @@
 package br.ufba.arieslinter.checks;
 
+import br.ufba.arieslinter.checks.abstracts.AbstractTestSmellCheck;
+import br.ufba.arieslinter.checks.constants.TestAnnotations;
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
-import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @StatelessCheck
-public class AssertionRouletteTestCheck extends AbstractCheck {
+public class AssertionRouletteTestCheck extends AbstractTestSmellCheck {
 
-    // TODO: TESTAR CLASSE AssertionRouletteTestCheck
+  @Override
+  public int[] getAcceptableTokens() {
+    return new int[] { TokenTypes.METHOD_DEF };
+  }
 
-    @Override
-    public int[] getAcceptableTokens() {
-        return new int[] { TokenTypes.METHOD_DEF };
+  @Override
+  public int[] getRequiredTokens() {
+    return getAcceptableTokens();
+  }
+
+  @Override
+  public int[] getDefaultTokens() {
+    return getAcceptableTokens();
+  }
+
+  @Override
+  public void visitToken(DetailAST ast) {
+    if (!hasAnyAnnotation(ast, TestAnnotations.ALL_TEST_ANNOTATIONS)) {
+      return;
     }
 
-    @Override
-    public int[] getRequiredTokens() {
-        return getAcceptableTokens();
+    List<DetailAST> assertionsWithoutMessage = collectAssertionsWithoutMessage(ast);
+
+    // Assertion Roulette: 2 ou mais assertions sem mensagem
+    if (assertionsWithoutMessage.size() >= 2) {
+      log(ast.getLineNo(),
+          "Assertion Roulette: Test method has {0} assertions without explanatory messages. "
+              + "Add a message as the first parameter to identify which assertion failed.",
+          assertionsWithoutMessage.size());
+    }
+  }
+
+  /**
+   * Busca recursiva para encontrar assertions em qualquer profundidade.
+   */
+  private List<DetailAST> collectAssertionsWithoutMessage(DetailAST methodAst) {
+    List<DetailAST> assertionsWithoutMessage = new ArrayList<>();
+
+    DetailAST methodBody = methodAst.findFirstToken(TokenTypes.SLIST);
+    if (methodBody != null) {
+      scanForAssertions(methodBody, assertionsWithoutMessage);
     }
 
-    @Override
-    public int[] getDefaultTokens() {
-        return getAcceptableTokens();
+    return assertionsWithoutMessage;
+  }
+
+  /**
+   * Escaneia recursivamente por assertions sem mensagem.
+   */
+  private void scanForAssertions(DetailAST node, List<DetailAST> assertionsWithoutMessage) {
+    if (node == null) {
+      return;
     }
 
-    private static class AssertInfo {
-        String message;
-        int line;
-
-        AssertInfo(String message, int line) {
-            this.message = message;
-            this.line = line;
-        }
+    if (node.getType() == TokenTypes.METHOD_CALL && isAssertionMethod(node)) {
+      if (!hasMessage(node)) {
+        assertionsWithoutMessage.add(node);
+      }
     }
 
-    @Override
-    public void visitToken(DetailAST ast) {
-        if (hasAnnotation(ast, "Test")) {
-            List<AssertInfo> asserts = collectAsserts(ast);
-            checkAssertionRoulette(asserts);
-        }
+    // Continua busca recursiva
+    DetailAST child = node.getFirstChild();
+    while (child != null) {
+      scanForAssertions(child, assertionsWithoutMessage);
+      child = child.getNextSibling();
+    }
+  }
+
+  /**
+   * Verifica se é um método de assertion.
+   */
+  private boolean isAssertionMethod(DetailAST methodCall) {
+    String methodName = getMethodName(methodCall);
+    return methodName != null &&
+        (methodName.startsWith("assert") || methodName.equals("fail"));
+  }
+
+  /**
+   * Verifica se a assertion tem mensagem.
+   * A mensagem é o PRIMEIRO parâmetro, se for String literal ou lambda.
+   */
+  private boolean hasMessage(DetailAST methodCall) {
+    DetailAST elist = methodCall.findFirstToken(TokenTypes.ELIST);
+    if (elist == null) {
+      return false;
     }
 
-    private List<AssertInfo> collectAsserts(DetailAST methodAst) {
-        List<AssertInfo> asserts = new ArrayList<>();
-        DetailAST slist = methodAst.findFirstToken(TokenTypes.SLIST);
-
-        if (slist != null) {
-            DetailAST child = slist.getFirstChild();
-            while (child != null) {
-                if (child.getType() == TokenTypes.EXPR) {
-                    DetailAST methodCall = child.getFirstChild();
-                    
-                    if (methodCall != null && methodCall.getType() == TokenTypes.METHOD_CALL) {
-                        processMethodCall(methodCall, asserts);
-                    }
-                }
-
-                child = child.getNextSibling();
-            }
-        }
-        return asserts;
+    DetailAST firstParam = elist.getFirstChild();
+    if (firstParam == null) {
+      return false;
     }
 
-    private void processMethodCall(DetailAST methodCall, List<AssertInfo> asserts) {
-        String methodName = methodCall.findFirstToken(TokenTypes.IDENT).getText();
-
-        if (methodName.startsWith("assert")) {
-            String message = extractMessage(methodCall);
-            asserts.add(new AssertInfo(message, methodCall.getLineNo()));
-        }
+    // Desembrulha EXPR se necessário
+    if (firstParam.getType() == TokenTypes.EXPR) {
+      firstParam = firstParam.getFirstChild();
     }
 
-    private String extractMessage(DetailAST methodCall) {
-        DetailAST elist = methodCall.findFirstToken(TokenTypes.ELIST);
-        if (elist != null) {
-            DetailAST firstParam = elist.getFirstChild();
-            if (firstParam != null && firstParam.getType() == TokenTypes.STRING_LITERAL) {
-                return firstParam.getText();
-            }
-        }
-        return null;
+    if (firstParam == null) {
+      return false;
     }
 
-    private void checkAssertionRoulette(List<AssertInfo> asserts) {
-        if (asserts.size() < 2) return;
-
-        // Verifica mensagens duplicadas
-        Map<String, List<Integer>> messageMap = new HashMap<>();
-        for (AssertInfo assertInfo : asserts) {
-            if (assertInfo.message != null) {
-                messageMap.computeIfAbsent(assertInfo.message, k -> new ArrayList<>())
-                        .add(assertInfo.line);
-            }
-        }
-
-        for (Map.Entry<String, List<Integer>> entry : messageMap.entrySet()) {
-            if (entry.getValue().size() >= 2) {
-                entry.getValue().forEach(line ->
-                        log(line, "Assertion Roulette detected: duplicate message"));
-            }
-        }
-
-        // Verifica asserts sem mensagem
-        long noMessageCount = asserts.stream().filter(a -> a.message == null).count();
-        if (noMessageCount >= 2) {
-            log(asserts.get(0).line, "Assertion Roulette detected: without message");
-        }
-    }       
-
-    // Métodu auxiliar
-    private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
-        DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
-        if (modifiers != null) {
-            for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
-                if (child.getType() == TokenTypes.ANNOTATION) {
-                    DetailAST annotationIdent = child.findFirstToken(TokenTypes.IDENT);
-                    if (annotationIdent != null && annotationIdent.getText().equals(annotationName)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+    // Primeiro parâmetro é String literal → tem mensagem
+    if (firstParam.getType() == TokenTypes.STRING_LITERAL) {
+      // Verifica se a String não está vazia
+      String text = firstParam.getText();
+      return text != null && text.length() > 2;
     }
+
+    // Primeiro parâmetro é lambda → tem mensagem (Supplier<String>)
+    if (firstParam.getType() == TokenTypes.LAMBDA) {
+      return true;
+    }
+
+    return false;
+  }
 }
