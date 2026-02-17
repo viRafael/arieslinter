@@ -1,77 +1,17 @@
 package br.ufba.arieslinter.checks;
 
+import br.ufba.arieslinter.checks.abstracts.AbstractTestSmellCheck;
+import br.ufba.arieslinter.checks.constants.TestAnnotations;
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
-import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.Arrays;
-
-   // TODO: TESTAR CLASSE ConstructorInitializationCheck
-
-//// Caso 1: Classe de Teste com Construtor Explícito → DEVE REPORTAR (Linha 3)
-//    public class CalculatorTest {
-//        public CalculatorTest() {
-//            // Smell: inicialização no construtor
-//        }
-//
-//        @Test
-//        public void testSum() { /*...*/ }
-//    }
-//
-//// Caso 2: Classe Não-Teste com Construtor → NÃO REPORTAR
-//class InvalidClass {
-//    public InvalidClass() {
-//        System.out.println("Não é um teste!");
-//    }
-//}
-//
-//// Caso 3: Classe Válida com setUp() → NÃO REPORTAR
-//class ValidTest {
-//    @Before
-//    public void setUp() { /*...*/ }
-//
-//    @Test
-//    public void testValid() { /*...*/ }
-//}
-//
-//// Caso 5: Classe Interna → NÃO REPORTAR
-//class MainTest {
-//    @Test
-//    public void testMain() { /*...*/ }
-//
-//    class InnerTestClass {
-//        public InnerTestClass() { /*...*/ }
-//    }
-//}
-//
-//// Caso 6: Construtor Privado → DEVE REPORTAR (Linha 40)
-//class PrivateConstructorTest {
-//    private PrivateConstructorTest() { /*...*/ }
-//
-//    @Test
-//    public void testPrivate() { /*...*/ }
-//}
-//
-//// Caso 8: Múltiplos Construtores → 2 REPORTES (Linhas 55 e 59)
-//class MultipleConstructorsTest {
-//    public MultipleConstructorsTest() { /*...*/ }
-//
-//    public MultipleConstructorsTest(int param) { /*...*/ }
-//
-//    @Test
-//    public void testA() { /*...*/ }
-//}
 
 @StatelessCheck
-public class ConstructorInitializationCheck extends AbstractCheck {
-    private Set<String> allowedClasses = new HashSet<>(Arrays.asList("ArrayList", "HashMap")); // Exemplos permitidos
-    private boolean ignoreTestFrameworkClasses = true; // Ignora classes como Mockito/JUnit
+public class ConstructorInitializationCheck extends AbstractTestSmellCheck {
 
     @Override
     public int[] getAcceptableTokens() {
-        return new int[] { TokenTypes.METHOD_DEF };
+        return new int[] {TokenTypes.CLASS_DEF};
     }
 
     @Override
@@ -86,63 +26,75 @@ public class ConstructorInitializationCheck extends AbstractCheck {
 
     @Override
     public void visitToken(DetailAST ast) {
-        if (!hasAnnotation(ast, "Test")) return;
-
-        DetailAST methodBody = ast.findFirstToken(TokenTypes.SLIST);
-        if (methodBody != null) {
-            checkForConstructorCalls(methodBody);
+        if (!isTestClass(ast)) {
+            return;
         }
+
+        checkForConstructors(ast);
     }
 
-    private void checkForConstructorCalls(DetailAST node) {
-        DetailAST current = node.getFirstChild();
+    /**
+     * Verifica se é uma classe de teste pelo nome ou por ter métodos @Test.
+     */
+    private boolean isTestClass(DetailAST classDefAst) {
+        String className = getClassName(classDefAst);
+        if (className != null &&
+            (className.endsWith("Test") || className.endsWith("Tests"))) {
+            return true;
+        }
 
-        while (current != null) {
-            if (current.getType() == TokenTypes.LITERAL_NEW) {
-                String className = extractClassName(current);
-                if (!isAllowed(className)) {
-                    log(current.getLineNo(), "Constructor Initialization detected: Chamada ao construtor ''{0}'' no método de teste", className);
-                }
+        return hasTestMethods(classDefAst);
+    }
+
+    /**
+     * Procura construtores declarados na classe de teste.
+     */
+    private void checkForConstructors(DetailAST classDefAst) {
+        String className = getClassName(classDefAst);
+
+        DetailAST objBlock = classDefAst.findFirstToken(TokenTypes.OBJBLOCK);
+        if (objBlock == null) {
+            return;
+        }
+
+        DetailAST child = objBlock.getFirstChild();
+        while (child != null) {
+            if (child.getType() == TokenTypes.CTOR_DEF) {
+                log(child.getLineNo(),
+                    "Constructor Initialization: Test class ''{0}'' defines a constructor. "
+                        + "Use @Before/@BeforeEach for field initialization instead.",
+                    className);
             }
+            child = child.getNextSibling();
+        }
+    }
 
-            // Verifica filhos recursivamente
-            if (current.hasChildren()) {    
-                checkForConstructorCalls(current);
+    /**
+     * Obtém o nome da classe.
+     */
+    private String getClassName(DetailAST classDefAst) {
+        DetailAST identNode = classDefAst.findFirstToken(TokenTypes.IDENT);
+        return identNode != null ? identNode.getText() : null;
+    }
+
+    /**
+     * Verifica se a classe tem pelo menos um método @Test.
+     */
+    private boolean hasTestMethods(DetailAST classDefAst) {
+        DetailAST objBlock = classDefAst.findFirstToken(TokenTypes.OBJBLOCK);
+        if (objBlock == null) {
+            return false;
+        }
+
+        DetailAST child = objBlock.getFirstChild();
+        while (child != null) {
+            if (child.getType() == TokenTypes.METHOD_DEF &&
+                hasAnyAnnotation(child, TestAnnotations.ALL_TEST_ANNOTATIONS)) {
+                return true;
             }
-
-            current = current.getNextSibling();
+            child = child.getNextSibling();
         }
-    }
 
-    private String extractClassName(DetailAST newToken) {
-        DetailAST type = newToken.getFirstChild();
-        if (type.getType() == TokenTypes.IDENT) {
-            return type.getText();
-        } else if (type.getType() == TokenTypes.DOT) { // Para classes qualificadas (ex: new com.example.MyClass())
-            return type.getLastChild().getText();
-        }
-        return "-1";
-    }
-
-    private boolean isAllowed(String className) {
-        // Permite classes configuradas ou do framework de teste
-        return allowedClasses.contains(className) || 
-               (ignoreTestFrameworkClasses && className.matches("^(Mock|Test|Assert|Matchers).*"));
-    }
-
-    // Métodu auxiliar
-    private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
-        DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
-        if (modifiers != null) {
-            for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
-                if (child.getType() == TokenTypes.ANNOTATION) {
-                    DetailAST annotationIdent = child.findFirstToken(TokenTypes.IDENT);
-                    if (annotationIdent != null && annotationIdent.getText().equals(annotationName)) {
-                        return true;
-                    }
-                }
-            }
-        }
         return false;
     }
 }
