@@ -52,7 +52,13 @@ public class ResourceOptimismCheck extends AbstractTestSmellCheck {
             "list",
             "listFiles",
             "length",
-            "lastModified");
+            "lastModified",
+            "renameTo",
+            "setExecutable",
+            "setWritable",
+            "setReadable",
+            "isHidden",
+            "setLastModified");
 
     @Override
     public int[] getAcceptableTokens() {

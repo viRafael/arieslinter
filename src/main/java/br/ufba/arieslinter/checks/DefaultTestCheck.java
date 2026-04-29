@@ -37,9 +37,12 @@ public class DefaultTestCheck extends AbstractTestSmellCheck {
         if (ident != null) {
             String className = ident.getText();
 
-            // Verifica se o nome está na lista de proibidos
-            if (forbiddenClassNames.contains(className)) {
-                log(ast.getLineNo(), "Default Test detected: rename the class ", className);
+            // Verifica se o nome começa com os prefixos proibidos
+            for (String forbidden : forbiddenClassNames) {
+                if (className.startsWith(forbidden)) {
+                    log(ast.getLineNo(), "Default Test detected: rename the class ''{0}'' or delete it", className);
+                    break;
+                }
             }
         }
     }

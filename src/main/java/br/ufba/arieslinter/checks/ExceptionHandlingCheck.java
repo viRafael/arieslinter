@@ -33,12 +33,12 @@ public class ExceptionHandlingCheck extends AbstractTestSmellCheck {
         if (methodBody == null)
             return;
 
-        boolean hasTry = containsToken(methodBody, TokenTypes.LITERAL_TRY);
         boolean hasCatch = containsToken(methodBody, TokenTypes.LITERAL_CATCH);
-        boolean hasFinally = containsToken(methodBody, TokenTypes.LITERAL_FINALLY);
+        boolean hasThrow = containsToken(methodBody, TokenTypes.LITERAL_THROW);
 
-        if (hasTry || hasCatch || hasFinally) {
-            log(ast.getLineNo(), "Exception Handling detected: test method contains try/catch/finally blocks");
+        if (hasCatch || hasThrow) {
+            log(ast.getLineNo(), "Exception Handling: Test method contains a catch clause or a throw statement. "
+                    + "Use JUnit''s built-in exception handling instead.");
         }
     }
 

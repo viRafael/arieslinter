@@ -99,7 +99,7 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
     }
 
     /**
-     * Escaneia recursivamente por instanciações de recursos externos.
+     * Escaneia recursivamente por instanciações ou chamadas de recursos externos.
      */
     private void scanForExternalResources(DetailAST node) {
         if (node == null) {
@@ -110,12 +110,36 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
         if (node.getType() == TokenTypes.LITERAL_NEW) {
             processNewExpression(node);
         }
+        
+        // Verifica se é uma chamada de método estático ou qualificado (ex: DriverManager.getConnection)
+        if (node.getType() == TokenTypes.METHOD_CALL) {
+            processMethodCall(node);
+        }
 
         // Continua busca recursiva
         DetailAST child = node.getFirstChild();
         while (child != null) {
             scanForExternalResources(child);
             child = child.getNextSibling();
+        }
+    }
+
+    /**
+     * Processa uma chamada de método verificando se pertence a um recurso externo.
+     */
+    private void processMethodCall(DetailAST methodCallNode) {
+        DetailAST firstChild = methodCallNode.getFirstChild();
+        if (firstChild != null && firstChild.getType() == TokenTypes.DOT) {
+            DetailAST target = firstChild.getFirstChild();
+            if (target != null && target.getType() == TokenTypes.IDENT) {
+                String targetName = target.getText();
+                if (isExternalResource(targetName)) {
+                    log(methodCallNode.getLineNo(),
+                        "Mystery Guest: Test uses external resource class ''{0}''. "
+                                + "Use mocks or in-memory alternatives instead.",
+                        targetName);
+                }
+            }
         }
     }
 
