@@ -2,13 +2,15 @@
 
 A static analysis linter for detecting **test smells** in Java test code.
 
-> 📄 Accepted at **CBSOFT 2025** — [Read the paper](https://drive.google.com/file/d/1SQ5c2_XlFVYEGTERW3FSlOD4qIpctqsD/view) · [Artifact on Zenodo](https://zenodo.org/records/16998677)
+> Accepted at **CBSOFT 2025**
+> 📄 [Read the paper](https://drive.google.com/file/d/1SQ5c2_XlFVYEGTERW3FSlOD4qIpctqsD/view)
+> 💾 [Artifact on Zenodo](https://zenodo.org/records/16998677)
 
 ---
 
 ## What It Does
 
-Arieslinter analyzes Java test code and reports occurrences of test smells - patterns that reduce the quality, readability, and maintainability of test suites. It integrates with existing Java tooling via Checkstyle, requiring no changes to your build process.
+Arieslinter analyzes Java test code and reports occurrences of test smells patterns that reduce the quality, readability, and maintainability of test suites. It integrates with existing Java tooling via Checkstyle, requiring no changes to your build process.
 
 ### Detected Test Smells
 
@@ -17,7 +19,6 @@ Arieslinter analyzes Java test code and reports occurrences of test smells - pat
 | `AssertionRouletteTestCheck` | Multiple assertions without explanatory messages |
 | `ConditionalTestLogicCheck` | Conditional/loop logic inside test methods |
 | `ConstructorInitializationCheck` | Test class defines a constructor instead of using `@Before` |
-| `DefaultTestCheck` | Default auto-generated test classes left unrenamed |
 | `DuplicateAssertCheck` | Same assertion repeated multiple times in a test |
 | `EagerTestCheck` | Test method calls multiple different production methods |
 | `EmptyTestCheck` | Test method with no executable statements |
@@ -50,7 +51,7 @@ mvn clean install
 
 ## Configuration
 
-Add a `checkstyle.xml` file to your project root:
+Add a `checkstyle.xml` file to your root of the project that you want to analyze:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -62,7 +63,6 @@ Add a `checkstyle.xml` file to your project root:
         <module name="br.ufba.arieslinter.checks.AssertionRouletteTestCheck"/>
         <module name="br.ufba.arieslinter.checks.ConditionalTestLogicCheck"/>
         <module name="br.ufba.arieslinter.checks.ConstructorInitializationCheck"/>
-        <module name="br.ufba.arieslinter.checks.DefaultTestCheck"/>
         <module name="br.ufba.arieslinter.checks.DuplicateAssertCheck"/>
         <module name="br.ufba.arieslinter.checks.EagerTestCheck"/>
         <module name="br.ufba.arieslinter.checks.EmptyTestCheck"/>
@@ -122,4 +122,4 @@ Add a `checkstyle.xml` file to your project root:
 Arieslinter was developed as part of an academic research project at **UFBA (Universidade Federal da Bahia)**. The accompanying paper was accepted at **CBSOFT 2025**, presenting the tool's architecture, the implemented checks, and experimental results from real-world Java projects.
 
 - 📄 [Read the paper (Google Drive)](https://drive.google.com/file/d/1SQ5c2_XlFVYEGTERW3FSlOD4qIpctqsD/view)
-- 📦 [Artifact on Zenodo](https://zenodo.org/records/16998677)
+- 💾 [Artifact on Zenodo](https://zenodo.org/records/16998677)
