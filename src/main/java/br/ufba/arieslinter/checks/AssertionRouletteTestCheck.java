@@ -91,7 +91,7 @@ public class AssertionRouletteTestCheck extends AbstractTestSmellCheck {
 
   /**
    * Verifica se a assertion tem mensagem.
-   * A mensagem é o PRIMEIRO parâmetro, se for String literal ou lambda.
+   * Considera as assinaturas do JUnit 4 (mensagem no início) e JUnit 5 (mensagem no fim).
    */
   private boolean hasMessage(DetailAST methodCall) {
     DetailAST elist = methodCall.findFirstToken(TokenTypes.ELIST);
@@ -99,32 +99,89 @@ public class AssertionRouletteTestCheck extends AbstractTestSmellCheck {
       return false;
     }
 
-    DetailAST firstParam = elist.getFirstChild();
-    if (firstParam == null) {
+    List<DetailAST> args = getArguments(elist);
+    int argCount = args.size();
+    String methodName = getMethodName(methodCall);
+
+    if (methodName == null) {
       return false;
     }
 
-    // Desembrulha EXPR se necessário
-    if (firstParam.getType() == TokenTypes.EXPR) {
-      firstParam = firstParam.getFirstChild();
+    // fail() pode ter 0 ou 1 argumento (a mensagem)
+    if ("fail".equals(methodName)) {
+      return argCount >= 1 && isStringOrLambda(args.get(0));
     }
 
-    if (firstParam == null) {
+    // Assertions com 1 ou 2 parâmetros (assertTrue, assertFalse, assertNull, assertNotNull)
+    if (methodName.equals("assertTrue") || methodName.equals("assertFalse") ||
+        methodName.equals("assertNull") || methodName.equals("assertNotNull")) {
+      if (argCount == 2) {
+        // JUnit 4: (message, condition) ou JUnit 5: (condition, message)
+        return isStringOrLambda(args.get(0)) || isStringOrLambda(args.get(1));
+      }
       return false;
     }
 
-    // Primeiro parâmetro é String literal → tem mensagem
-    if (firstParam.getType() == TokenTypes.STRING_LITERAL) {
-      // Verifica se a String não está vazia
-      String text = firstParam.getText();
-      return text != null && text.length() > 2;
+    // Assertions com 2 ou 3 parâmetros (assertEquals, assertNotEquals, assertSame, assertNotSame, assertArrayEquals)
+    if (methodName.equals("assertEquals") || methodName.equals("assertNotEquals") ||
+        methodName.equals("assertSame") || methodName.equals("assertNotSame") ||
+        methodName.equals("assertArrayEquals")) {
+      if (argCount == 3) {
+        // JUnit 4: (message, expected, actual) ou JUnit 5: (expected, actual, message)
+        return isStringOrLambda(args.get(0)) || isStringOrLambda(args.get(2));
+      }
+      if (argCount == 4) {
+        // Caso especial JUnit 4: assertEquals(String message, double expected, double actual, double delta)
+        return isStringOrLambda(args.get(0));
+      }
+      return false;
     }
 
-    // Primeiro parâmetro é lambda → tem mensagem (Supplier<String>)
-    if (firstParam.getType() == TokenTypes.LAMBDA) {
-      return true;
+    // Fallback para outros métodos assertX(...)
+    if (argCount >= 2) {
+      return isStringOrLambda(args.get(0)) || isStringOrLambda(args.get(argCount - 1));
     }
 
     return false;
+  }
+
+  /**
+   * Extrai a lista de expressões (argumentos) de um nó ELIST.
+   */
+  private List<DetailAST> getArguments(DetailAST elist) {
+    List<DetailAST> args = new ArrayList<>();
+    DetailAST child = elist.getFirstChild();
+    while (child != null) {
+      if (child.getType() == TokenTypes.EXPR) {
+        args.add(child);
+      }
+      child = child.getNextSibling();
+    }
+    return args;
+  }
+
+  /**
+   * Verifica se um nó de parâmetro é uma String literal ou um Lambda (Supplier de mensagem).
+   */
+  private boolean isStringOrLambda(DetailAST param) {
+    if (param == null) {
+      return false;
+    }
+
+    DetailAST node = param;
+    if (node.getType() == TokenTypes.EXPR) {
+      node = node.getFirstChild();
+    }
+
+    if (node == null) {
+      return false;
+    }
+
+    if (node.getType() == TokenTypes.STRING_LITERAL) {
+      String text = node.getText();
+      return text != null && text.length() > 2; // Ignora ""
+    }
+
+    return node.getType() == TokenTypes.LAMBDA;
   }
 }
