@@ -33,7 +33,7 @@ Arieslinter analyzes Java test code and reports occurrences of test smells patte
 | `ResourceOptimismCheck` | File used without checking existence first |
 | `SensitiveEqualityCheck` | Use of `toString()` in assertions |
 | `SleepyTestCheck` | Use of `Thread.sleep()` inside tests |
-| `UnknownFixtureCheck` | Test method without any assertion |
+| `UnknownTestCheck` | Test method without any assertion |
 | `VerboseTestCheck` | Overly long test methods |
 
 ---
@@ -77,7 +77,7 @@ Add a `checkstyle.xml` file to your root of the project that you want to analyze
         <module name="br.ufba.arieslinter.checks.ResourceOptimismCheck"/>
         <module name="br.ufba.arieslinter.checks.SensitiveEqualityCheck"/>
         <module name="br.ufba.arieslinter.checks.SleepyTestCheck"/>
-        <module name="br.ufba.arieslinter.checks.UnknownFixtureCheck"/>
+        <module name="br.ufba.arieslinter.checks.UnknownTestCheck"/>
         <module name="br.ufba.arieslinter.checks.VerboseTestCheck"/>
     </module>
 </module>
