@@ -6,7 +6,9 @@ import com.puppycrawl.tools.checkstyle.StatelessCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 @StatelessCheck
@@ -21,8 +23,10 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
         EXTERNAL_RESOURCE_CLASSES.add("FileReader");
         EXTERNAL_RESOURCE_CLASSES.add("FileWriter");
         EXTERNAL_RESOURCE_CLASSES.add("RandomAccessFile");
-        EXTERNAL_RESOURCE_CLASSES.add("Path");
-        EXTERNAL_RESOURCE_CLASSES.add("Paths");
+        EXTERNAL_RESOURCE_CLASSES.add("JarFile");
+        EXTERNAL_RESOURCE_CLASSES.add("JarOutputStream");
+        EXTERNAL_RESOURCE_CLASSES.add("ZipFile");
+        EXTERNAL_RESOURCE_CLASSES.add("ZipOutputStream");
         EXTERNAL_RESOURCE_CLASSES.add("Files");
 
         // Database
@@ -47,26 +51,6 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
         EXTERNAL_RESOURCE_CLASSES.add("Transport");
         EXTERNAL_RESOURCE_CLASSES.add("Message");
         EXTERNAL_RESOURCE_CLASSES.add("MimeMessage");
-    }
-
-    // Classes de mock/test que são permitidas
-    private static final Set<String> ALLOWED_TEST_CLASSES = new HashSet<>();
-
-    static {
-        // Mockito
-        ALLOWED_TEST_CLASSES.add("Mock");
-        ALLOWED_TEST_CLASSES.add("Mockito");
-        ALLOWED_TEST_CLASSES.add("MockedStatic");
-        ALLOWED_TEST_CLASSES.add("MockedConstruction");
-
-        // Test utilities
-        ALLOWED_TEST_CLASSES.add("TemporaryFolder");
-        ALLOWED_TEST_CLASSES.add("TempDir");
-
-        // In-memory databases
-        ALLOWED_TEST_CLASSES.add("H2");
-        ALLOWED_TEST_CLASSES.add("HSQLDB");
-        ALLOWED_TEST_CLASSES.add("Derby");
     }
 
     @Override
@@ -95,117 +79,205 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
             return;
         }
 
-        scanForExternalResources(methodBody);
+        // 1. Obter campos não mockados da classe
+        Map<String, DetailAST> unmockedFields = getUnmockedFields(ast);
+
+        // 2. Escanear o corpo do método por recursos externos
+        Set<String> reportedResources = new HashSet<>();
+        scanMethodForMysteryGuest(methodBody, unmockedFields, reportedResources);
     }
 
-    /**
-     * Escaneia recursivamente por instanciações ou chamadas de recursos externos.
-     */
-    private void scanForExternalResources(DetailAST node) {
+    private void scanMethodForMysteryGuest(DetailAST node,
+                                           Map<String, DetailAST> unmockedFields,
+                                           Set<String> reportedResources) {
         if (node == null) {
             return;
         }
 
-        // Verifica se é um 'new' (instanciação)
+        // Caso 1: Instanciação direta (new File(...))
         if (node.getType() == TokenTypes.LITERAL_NEW) {
-            processNewExpression(node);
-        }
-        
-        // Verifica se é uma chamada de método estático ou qualificado (ex: DriverManager.getConnection)
-        if (node.getType() == TokenTypes.METHOD_CALL) {
-            processMethodCall(node);
+            String className = getClassName(node);
+            if (className != null && isExternalResource(className)) {
+                if (!isInsideMockCall(node) && !reportedResources.contains(className)) {
+                    log(node.getLineNo(),
+                            "Mystery Guest: Test instantiates external resource ''{0}''. "
+                                    + "Use mocks or in-memory alternatives instead.",
+                            className);
+                    reportedResources.add(className);
+                }
+            }
         }
 
-        // Continua busca recursiva
+        // Caso 2: Declaração de variável local
+        if (node.getType() == TokenTypes.VARIABLE_DEF) {
+            String typeName = getTypeName(node);
+            if (typeName != null && isExternalResource(typeName)) {
+                if (!isMocked(node) && !reportedResources.contains(typeName)) {
+                    log(node.getLineNo(),
+                            "Mystery Guest: Test declares external resource variable of type ''{0}''. "
+                                    + "Use mocks or in-memory alternatives instead.",
+                            typeName);
+                    reportedResources.add(typeName);
+                }
+            }
+        }
+
+        // Caso 3: Declaração de parâmetro (ex: em foreach)
+        if (node.getType() == TokenTypes.PARAMETER_DEF) {
+            String typeName = getTypeName(node);
+            if (typeName != null && isExternalResource(typeName)) {
+                if (!reportedResources.contains(typeName)) {
+                    log(node.getLineNo(),
+                            "Mystery Guest: Test uses external resource parameter of type ''{0}''. "
+                                    + "Use mocks or in-memory alternatives instead.",
+                            typeName);
+                    reportedResources.add(typeName);
+                }
+            }
+        }
+
+        // Caso 4: Chamada de método estático em uma classe proibida (ex: DriverManager.getConnection, Files.write)
+        if (node.getType() == TokenTypes.METHOD_CALL) {
+            DetailAST firstChild = node.getFirstChild();
+            if (firstChild != null && firstChild.getType() == TokenTypes.DOT) {
+                DetailAST target = firstChild.getFirstChild();
+                if (target != null && target.getType() == TokenTypes.IDENT) {
+                    String targetName = target.getText();
+                    if (isExternalResource(targetName) && !reportedResources.contains(targetName)) {
+                        log(node.getLineNo(),
+                                "Mystery Guest: Test calls method on external resource class ''{0}''. "
+                                        + "Use mocks or in-memory alternatives instead.",
+                                targetName);
+                        reportedResources.add(targetName);
+                    }
+                }
+            }
+        }
+
+        // Caso 5: Referência a campo não mockado do tipo recurso externo
+        if (node.getType() == TokenTypes.IDENT) {
+            String name = node.getText();
+            if (unmockedFields.containsKey(name)) {
+                DetailAST fieldDef = unmockedFields.get(name);
+                String typeName = getTypeName(fieldDef);
+                if (typeName != null && !reportedResources.contains(name)) {
+                    log(node.getLineNo(),
+                            "Mystery Guest: Test utilizes class field ''{0}'' of external resource type ''{1}''. "
+                                    + "Use mocks or in-memory alternatives instead.",
+                            name, typeName);
+                    reportedResources.add(name);
+                }
+            }
+        }
+
+        // Recursão para filhos
         DetailAST child = node.getFirstChild();
         while (child != null) {
-            scanForExternalResources(child);
+            scanMethodForMysteryGuest(child, unmockedFields, reportedResources);
             child = child.getNextSibling();
         }
     }
 
-    /**
-     * Processa uma chamada de método verificando se pertence a um recurso externo.
-     */
-    private void processMethodCall(DetailAST methodCallNode) {
-        DetailAST firstChild = methodCallNode.getFirstChild();
-        if (firstChild != null && firstChild.getType() == TokenTypes.DOT) {
-            DetailAST target = firstChild.getFirstChild();
-            if (target != null && target.getType() == TokenTypes.IDENT) {
-                String targetName = target.getText();
-                if (isExternalResource(targetName)) {
-                    log(methodCallNode.getLineNo(),
-                        "Mystery Guest: Test uses external resource class ''{0}''. "
-                                + "Use mocks or in-memory alternatives instead.",
-                        targetName);
+    private Map<String, DetailAST> getUnmockedFields(DetailAST methodAst) {
+        Map<String, DetailAST> unmockedFields = new HashMap<>();
+        DetailAST parent = methodAst.getParent();
+        while (parent != null && parent.getType() != TokenTypes.CLASS_DEF) {
+            parent = parent.getParent();
+        }
+        if (parent != null) {
+            DetailAST objBlock = parent.findFirstToken(TokenTypes.OBJBLOCK);
+            if (objBlock != null) {
+                DetailAST child = objBlock.getFirstChild();
+                while (child != null) {
+                    if (child.getType() == TokenTypes.VARIABLE_DEF) {
+                        String typeName = getTypeName(child);
+                        if (typeName != null && isExternalResource(typeName)) {
+                            if (!isFieldMocked(child)) {
+                                DetailAST ident = child.findFirstToken(TokenTypes.IDENT);
+                                if (ident != null) {
+                                    unmockedFields.put(ident.getText(), child);
+                                }
+                            }
+                        }
+                    }
+                    child = child.getNextSibling();
                 }
             }
         }
+        return unmockedFields;
     }
 
-    /**
-     * Processa uma expressão 'new' verificando se é recurso externo.
-     */
-    private void processNewExpression(DetailAST newNode) {
-        String className = getClassName(newNode);
-
-        if (className == null || className.isEmpty()) {
-            return;
-        }
-
-        // Verifica se é uma classe de recurso externo
-        if (isExternalResource(className)) {
-            // Verifica se não está dentro de um mock (ex: mock(File.class))
-            if (!isInsideMockCall(newNode)) {
-                log(newNode.getLineNo(),
-                        "Mystery Guest: Test instantiates external resource ''{0}''. "
-                                + "Use mocks or in-memory alternatives instead of real external resources.",
-                        className);
+    private boolean isFieldMocked(DetailAST varDef) {
+        DetailAST modifiers = varDef.findFirstToken(TokenTypes.MODIFIERS);
+        if (modifiers != null) {
+            DetailAST child = modifiers.getFirstChild();
+            while (child != null) {
+                if (child.getType() == TokenTypes.ANNOTATION) {
+                    DetailAST annotationIdent = child.findFirstToken(TokenTypes.IDENT);
+                    if (annotationIdent != null) {
+                        String annotName = annotationIdent.getText();
+                        if ("Mock".equals(annotName) || "Spy".equals(annotName) || "MockBean".equals(annotName)) {
+                            return true;
+                        }
+                    }
+                }
+                child = child.getNextSibling();
             }
         }
+        return isMocked(varDef);
     }
 
-    /**
-     * Extrai o nome da classe de uma expressão 'new'.
-     */
+    private boolean isMocked(DetailAST varDef) {
+        DetailAST assign = varDef.findFirstToken(TokenTypes.ASSIGN);
+        if (assign != null) {
+            DetailAST expr = assign.findFirstToken(TokenTypes.EXPR);
+            if (expr != null) {
+                return hasMockCall(expr);
+            }
+        }
+        return false;
+    }
+
+    private boolean hasMockCall(DetailAST node) {
+        if (node.getType() == TokenTypes.METHOD_CALL) {
+            String methodName = getMethodName(node);
+            if ("mock".equals(methodName) || "spy".equals(methodName)) {
+                return true;
+            }
+        }
+        DetailAST child = node.getFirstChild();
+        while (child != null) {
+            if (hasMockCall(child)) {
+                return true;
+            }
+            child = child.getNextSibling();
+        }
+        return false;
+    }
+
     private String getClassName(DetailAST newNode) {
-        // O tipo vem logo após o 'new'
         DetailAST typeNode = newNode.getFirstChild();
         if (typeNode == null) {
             return null;
         }
-
-        // Pode ser IDENT (new File) ou DOT (new java.io.File)
         if (typeNode.getType() == TokenTypes.IDENT) {
             return typeNode.getText();
         } else if (typeNode.getType() == TokenTypes.DOT) {
-            // Pega apenas o nome da classe (File de java.io.File)
             DetailAST lastChild = typeNode.getLastChild();
             return lastChild != null ? lastChild.getText() : null;
         }
-
         return null;
     }
 
-    /**
-     * Verifica se a classe é um recurso externo proibido.
-     */
     private boolean isExternalResource(String className) {
         return EXTERNAL_RESOURCE_CLASSES.contains(className);
     }
 
-    /**
-     * Verifica se a instanciação está dentro de uma chamada mock().
-     * Ex: mock(File.class) é permitido
-     */
     private boolean isInsideMockCall(DetailAST node) {
         DetailAST parent = node.getParent();
-
         while (parent != null) {
             if (parent.getType() == TokenTypes.METHOD_CALL) {
                 String methodName = getMethodName(parent);
-
-                // Métodos de mocking conhecidos
                 if (methodName != null &&
                         (methodName.equals("mock") ||
                                 methodName.equals("spy") ||
@@ -214,10 +286,28 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
                     return true;
                 }
             }
-
             parent = parent.getParent();
         }
-
         return false;
+    }
+
+    private String getTypeName(DetailAST variableDef) {
+        DetailAST typeNode = variableDef.findFirstToken(TokenTypes.TYPE);
+        if (typeNode == null) {
+            return null;
+        }
+        DetailAST firstChild = typeNode.getFirstChild();
+        if (firstChild == null) {
+            return null;
+        }
+        if (firstChild.getType() == TokenTypes.IDENT) {
+            return firstChild.getText();
+        } else if (firstChild.getType() == TokenTypes.DOT) {
+            DetailAST lastChild = firstChild.getLastChild();
+            if (lastChild != null) {
+                return lastChild.getText();
+            }
+        }
+        return null;
     }
 }
