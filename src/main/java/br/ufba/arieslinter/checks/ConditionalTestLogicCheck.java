@@ -35,32 +35,43 @@ public class ConditionalTestLogicCheck extends AbstractTestSmellCheck {
 
   @Override
   public void visitToken(DetailAST ast) {
-    if (hasAnyAnnotation(ast, TestAnnotations.ALL_TEST_ANNOTATIONS)
-        && containsConditionalLogic(ast)) {
-      log(ast.getLineNo(), "Conditional Test Logic detected: test contains complex conditional logic");
+    if (hasAnyAnnotation(ast, TestAnnotations.ALL_TEST_ANNOTATIONS)) {
+      DetailAST slist = ast.findFirstToken(TokenTypes.SLIST);
+      if (slist != null) {
+        checkAndLogConditionals(slist);
+      }
     }
   }
 
-  private boolean containsConditionalLogic(DetailAST methodAst) {
-    DetailAST slist = methodAst.findFirstToken(TokenTypes.SLIST);
-    if (slist != null) {
-      return checkChildrenForConditionals(slist);
-    }
-    return false;
-  }
-
-  private boolean checkChildrenForConditionals(DetailAST node) {
+  private void checkAndLogConditionals(DetailAST node) {
     DetailAST child = node.getFirstChild();
     while (child != null) {
       if (isConditionalToken(child.getType())) {
-        return true;
+        String statementName = getStatementName(child.getType());
+        log(child.getLineNo(), "Conditional Test Logic: remove the " + statementName + " and split the test cases into separate test methods.");
       }
-      if (checkChildrenForConditionals(child)) {
-        return true;
-      }
+      checkAndLogConditionals(child);
       child = child.getNextSibling();
     }
-    return false;
+  }
+
+  private String getStatementName(int tokenType) {
+    switch (tokenType) {
+      case TokenTypes.LITERAL_IF:
+        return "''if'' statement";
+      case TokenTypes.LITERAL_FOR:
+        return "''for'' loop";
+      case TokenTypes.LITERAL_WHILE:
+        return "''while'' loop";
+      case TokenTypes.LITERAL_DO:
+        return "''do-while'' loop";
+      case TokenTypes.LITERAL_SWITCH:
+        return "''switch'' statement";
+      case TokenTypes.QUESTION:
+        return "ternary operator";
+      default:
+        return "conditional structure";
+    }
   }
 
   private boolean isConditionalToken(int tokenType) {
