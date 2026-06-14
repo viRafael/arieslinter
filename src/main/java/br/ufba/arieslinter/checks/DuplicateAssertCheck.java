@@ -171,7 +171,7 @@ public class DuplicateAssertCheck extends AbstractTestSmellCheck {
 
                 log(firstLine,
                         "Duplicate Assert: Assertion appears {0} times in this test method. "
-                                + "Consider removing duplicates or splitting into separate test methods.",
+                                + "Remove duplicates or splitting into separate test methods.",
                         lines.size());
             }
         }
