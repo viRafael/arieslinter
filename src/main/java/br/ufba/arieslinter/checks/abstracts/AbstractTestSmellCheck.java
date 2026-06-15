@@ -2,10 +2,15 @@ package br.ufba.arieslinter.checks.abstracts;
 
 import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
+import com.puppycrawl.tools.checkstyle.api.SeverityLevel;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 import java.util.Set;
 
 public abstract class AbstractTestSmellCheck extends AbstractCheck {
+
+    public AbstractTestSmellCheck() {
+        setSeverity(SeverityLevel.WARNING.toString());
+    }
 
     protected boolean hasAnnotation(DetailAST ast, String annotationName) {
         DetailAST modifiers = ast.findFirstToken(TokenTypes.MODIFIERS);
