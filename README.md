@@ -14,7 +14,7 @@ By integrating seamlessly with the Java ecosystem through standard Checkstyle co
 
 ## 🔍 Detected Test Smells
 
-Arieslinter currently supports **19 rules** to identify test smell patterns that compromise the readability, maintainability, and quality of your test suite:
+Arieslinter currently supports **17 rules** to identify test smell patterns that compromise the readability, maintainability, and quality of your test suite:
 
 | Check Style Module | Smell Name | Description |
 | :--- | :--- | :--- |
@@ -22,12 +22,10 @@ Arieslinter currently supports **19 rules** to identify test smell patterns that
 | [`ConditionalTestLogicCheck`](src/main/java/br/ufba/arieslinter/checks/ConditionalTestLogicCheck.java) | Conditional Test Logic | Conditional or loop statements (`if`, `switch`, `for`, `while`) inside test methods. Tests should be linear and simple. |
 | [`ConstructorInitializationCheck`](src/main/java/br/ufba/arieslinter/checks/ConstructorInitializationCheck.java) | Constructor Initialization | Test classes that define a constructor instead of using `@Before` or `@BeforeEach` for setup initialization. |
 | [`DuplicateAssertCheck`](src/main/java/br/ufba/arieslinter/checks/DuplicateAssertCheck.java) | Duplicate Assert | Identical assertion expressions repeated multiple times within the same test method. |
-| [`EagerTestCheck`](src/main/java/br/ufba/arieslinter/checks/EagerTestCheck.java) | Eager Test | A single test method calling multiple different production methods, violating the single responsibility principle of tests. |
 | [`EmptyTestCheck`](src/main/java/br/ufba/arieslinter/checks/EmptyTestCheck.java) | Empty Test | Test methods with empty bodies or no executable statements. |
 | [`ExceptionHandlingCheck`](src/main/java/br/ufba/arieslinter/checks/ExceptionHandlingCheck.java) | Exception Handling | Explicit `try-catch` blocks or explicit exceptions thrown within the test instead of letting the framework handle it. |
 | [`GeneralFixtureCheck`](src/main/java/br/ufba/arieslinter/checks/GeneralFixtureCheck.java) | General Fixture | SetUp methods initializing fields/fixtures that are not actually used by all test methods in the class. |
 | [`IgnoredTestCheck`](src/main/java/br/ufba/arieslinter/checks/IgnoredTestCheck.java) | Ignored Test | Test methods or classes marked with the `@Ignore` annotation. |
-| [`LazyTestCheck`](src/main/java/br/ufba/arieslinter/checks/LazyTestCheck.java) | Lazy Test | Multiple test methods exercising the exact same production method with similar parameters (should be consolidated). |
 | [`MagicNumberCheck`](src/main/java/br/ufba/arieslinter/checks/MagicNumberCheck.java) | Magic Number | Unnamed numerical literals used directly in test assertions. Use named constants or descriptive variables instead. |
 | [`MysteryGuestCheck`](src/main/java/br/ufba/arieslinter/checks/MysteryGuestCheck.java) | Mystery Guest | Tests that depend on external resources (e.g., local files, databases, network connections) rather than isolated fixtures. |
 | [`RedundantAssertionCheck`](src/main/java/br/ufba/arieslinter/checks/RedundantAssertionCheck.java) | Redundant Assertion | Assertions that will always pass or always fail (e.g., `assertTrue(true)` or comparing identical constants). |
