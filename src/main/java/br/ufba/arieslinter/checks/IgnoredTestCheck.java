@@ -27,8 +27,8 @@ public class IgnoredTestCheck extends AbstractTestSmellCheck {
     @Override
     public void visitToken(DetailAST ast) {
         if (hasAnnotation(ast, TestAnnotations.IGNORE)) {
-            String elementType = ast.getType() == TokenTypes.CLASS_DEF ? "Classe" : "Método";
-            log(ast.getLineNo(), "Ignored test detected: method" + elementType + "  with @Ignore, remove it");
+            String elementType = ast.getType() == TokenTypes.CLASS_DEF ? "class" : "method";
+            log(ast.getLineNo(), "Ignored test detected: " + elementType + " with @Ignore, remove it");
         }
     }
 }
