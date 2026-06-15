@@ -1,26 +1,15 @@
 package br.ufba.arieslinter.checks;
 
+import br.ufba.arieslinter.checks.abstracts.AbstractTestSmellCheck;
+import br.ufba.arieslinter.checks.constants.TestAnnotations;
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
-import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 import java.util.ArrayList;
 import java.util.List;
 
-    // TODO: TESTAR CLASSE RedundantAssertionCheck
-//    Comparação textual
-//      Parâmetros com a mesma representação textual serão considerados iguais, mesmo que sejam variáveis diferentes.
-//      Exemplo: assertEquals(a, a) → reportado, mesmo que a seja uma variável.
-//
-//    Expressões complexas:
-//      Não avalia expressões (ex: assertEquals(a + b, a + b)), apenas compara o texto do parâmetro.
-//      Saída: Assert redundante: 'assertEquals' (a + b).
-//
-//    Métodos sem parâmetros:
-//      fail() ou assertAll() não serão verificados, pois não têm parâmetros.
-
 @StatelessCheck
-public class RedundantAssertionCheck extends AbstractCheck {
+public class RedundantAssertionCheck extends AbstractTestSmellCheck {
 
     @Override
     public int[] getAcceptableTokens() {
@@ -39,81 +28,258 @@ public class RedundantAssertionCheck extends AbstractCheck {
 
     @Override
     public void visitToken(DetailAST ast) {
-        if (hasAnnotation(ast, "Test")) {
-            checkForRedundantAsserts(ast);
+        if (!hasAnyAnnotation(ast, TestAnnotations.ALL_TEST_ANNOTATIONS)) {
+            return;
+        }
+
+        DetailAST methodBody = ast.findFirstToken(TokenTypes.SLIST);
+        if (methodBody != null) {
+            scanForAssertions(methodBody);
         }
     }
 
-    private void checkForRedundantAsserts(DetailAST methodAst) {
-        DetailAST slist = methodAst.findFirstToken(TokenTypes.SLIST);
-
-        if (slist != null) {
-            DetailAST child = slist.getFirstChild();
-            while (child != null) {
-                if (child.getType() == TokenTypes.EXPR) {
-                    DetailAST methodCall = child.getFirstChild();
-                    if (methodCall != null && methodCall.getType() == TokenTypes.METHOD_CALL) {
-                        processMethodCall(methodCall);
-                    }
-                }
-                
-                child = child.getNextSibling();
-            }
+    private void scanForAssertions(DetailAST node) {
+        if (node == null) {
+            return;
         }
-    }
 
-    private void processMethodCall(DetailAST methodCall) {
-        String methodName = methodCall.findFirstToken(TokenTypes.IDENT).getText();
-        if (!methodName.startsWith("assert")) return;
-
-        DetailAST elist = methodCall.findFirstToken(TokenTypes.ELIST);
-        List<DetailAST> params = getChildren(elist);
-
-        // Verifica se o primeiro parâmetro é uma mensagem (STRING_LITERAL)
-        boolean hasMessage = !params.isEmpty() && params.get(0).getType() == TokenTypes.STRING_LITERAL;
-        List<DetailAST> relevantParams = hasMessage ? params.subList(1, params.size()) : params;
-
-        // Verifica parâmetros redundantes
-        checkForIdenticalParams(methodCall, methodName, relevantParams);
-    }
-
-    private void checkForIdenticalParams(DetailAST methodCall, String methodName, List<DetailAST> params) {
-        for (int i = 0; i < params.size(); i++) {
-            for (int j = i + 1; j < params.size(); j++) {
-                if (params.get(i).getText().equals(params.get(j).getText())) {
-                    //String paramValue = params.get(i).getText();
-                    log(methodCall.getLineNo(),
-                            // "Assert redundante em '" + methodName + "': parâmetros idênticos (" + paramValue + ")");
-                            "Redundant Assertion deteced: refactoring ou remove it");
-                    return; // Reporta apenas uma vez por assert
-                }
-            }
+        if (node.getType() == TokenTypes.METHOD_CALL) {
+            processAssertion(node);
         }
-    }
 
-    private List<DetailAST> getChildren(DetailAST node) {
-        List<DetailAST> children = new ArrayList<>();
         DetailAST child = node.getFirstChild();
         while (child != null) {
-            children.add(child);
+            scanForAssertions(child);
             child = child.getNextSibling();
         }
-        return children;
     }
 
-    // Métodu auxiliar
-    private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
-        DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
-        if (modifiers != null) {
-            for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
-                if (child.getType() == TokenTypes.ANNOTATION) {
-                    DetailAST annotationIdent = child.findFirstToken(TokenTypes.IDENT);
-                    if (annotationIdent != null && annotationIdent.getText().equals(annotationName)) {
-                        return true;
-                    }
-                }
+    private void processAssertion(DetailAST methodCall) {
+        String methodName = getMethodName(methodCall);
+
+        if (methodName == null || !isAssertionMethod(methodName)) {
+            return;
+        }
+
+        DetailAST elist = methodCall.findFirstToken(TokenTypes.ELIST);
+        if (elist == null) {
+            return;
+        }
+
+        // Pega os parâmetros e desembrulha os EXPR
+        List<DetailAST> allParams = getParameters(elist);
+        List<DetailAST> unwrappedParams = unwrapExpressions(allParams);
+
+        if (unwrappedParams.isEmpty()) {
+            return;
+        }
+
+        List<DetailAST> params = excludeMessage(methodName, unwrappedParams);
+
+        if (params.isEmpty()) {
+            return;
+        }
+
+        // Verifica redundância baseado no tipo de assertion
+        boolean isRedundant = checkRedundancy(methodName, params);
+
+        if (isRedundant) {
+            log(methodCall.getLineNo(), "Redundant Assertion: ''{0}'' compares identical values, " +
+                    "remove it.",
+                    methodName);
+        }
+    }
+
+    /**
+     * Remove o parâmetro de mensagem se ele estiver presente.
+     */
+    private List<DetailAST> excludeMessage(String methodName, List<DetailAST> params) {
+        int size = params.size();
+
+        // Para assertions de 1 argumento (assertTrue, assertNull, etc)
+        // Se houver 2 argumentos e o primeiro for String, o primeiro é a mensagem.
+        if (isSingleParamAssertion(methodName)) {
+            if (size >= 2 && params.get(0).getType() == TokenTypes.STRING_LITERAL) {
+                return params.subList(1, size);
             }
         }
+
+        // Para assertions de 2 argumentos (assertEquals, assertSame, etc)
+        // Se houver 3 argumentos e o primeiro for String, o primeiro é a mensagem.
+        if (isDoubleParamAssertion(methodName)) {
+            if ((size == 3 || size == 4) && params.get(0).getType() == TokenTypes.STRING_LITERAL) {
+                return params.subList(1, size);
+            }
+        }
+
+        return params;
+    }
+
+    private boolean isSingleParamAssertion(String methodName) {
+        return methodName.equals("assertTrue") || methodName.equals("assertFalse") ||
+               methodName.equals("assertNull") || methodName.equals("assertNotNull");
+    }
+
+    private boolean isDoubleParamAssertion(String methodName) {
+        return methodName.equals("assertEquals") || methodName.equals("assertNotEquals") ||
+               methodName.equals("assertSame") || methodName.equals("assertNotSame") ||
+               methodName.equals("assertArrayEquals");
+    }
+
+    /**
+     * Desembrulha nós EXPR e filtra apenas valores reais.
+     */
+    private List<DetailAST> unwrapExpressions(List<DetailAST> params) {
+        List<DetailAST> unwrapped = new ArrayList<>();
+
+        for (DetailAST param : params) {
+            DetailAST actualValue = param;
+
+            // Se é EXPR, desembrulha
+            if (param.getType() == TokenTypes.EXPR) {
+                actualValue = param.getFirstChild();
+            }
+
+            if (actualValue == null) {
+                continue;
+            }
+
+            // Apenas adiciona se for um tipo de valor válido
+            if (isValueNode(actualValue)) {
+                unwrapped.add(actualValue);
+            }
+        }
+
+        return unwrapped;
+    }
+
+    private boolean checkRedundancy(String methodName, List<DetailAST> params) {
+        // Assertions de igualdade
+        if (methodName.equals("assertEquals") ||
+                methodName.equals("assertSame") ||
+                methodName.equals("assertArrayEquals") ||
+                methodName.equals("assertIterableEquals") ||
+                methodName.equals("assertLinesMatch")) {
+            return isRedundantEqualityAssertion(params);
+        }
+
+        // Assertions de desigualdade
+        if (methodName.equals("assertNotEquals") ||
+                methodName.equals("assertNotSame")) {
+            return isRedundantInequalityAssertion(params);
+        }
+
+        if (methodName.equals("assertTrue")) {
+            return isRedundantTrueAssertion(params);
+        }
+
+        if (methodName.equals("assertFalse")) {
+            return isRedundantFalseAssertion(params);
+        }
+
+        if (methodName.equals("assertNull")) {
+            return isRedundantNullAssertion(params);
+        }
+
+        if (methodName.equals("assertNotNull")) {
+            return isRedundantNotNullAssertion(params);
+        }
+
         return false;
+    }
+
+    private boolean isRedundantTrueAssertion(List<DetailAST> params) {
+        if (params.isEmpty()) {
+            return false;
+        }
+        DetailAST condition = params.get(0);
+        return condition.getType() == TokenTypes.LITERAL_TRUE;
+    }
+
+    private boolean isRedundantFalseAssertion(List<DetailAST> params) {
+        if (params.isEmpty()) {
+            return false;
+        }
+        DetailAST condition = params.get(0);
+        return condition.getType() == TokenTypes.LITERAL_FALSE;
+    }
+
+    private boolean isRedundantEqualityAssertion(List<DetailAST> params) {
+        if (params.size() < 2) {
+            return false;
+        }
+        return areIdentical(params.get(0), params.get(1));
+    }
+
+    private boolean isRedundantInequalityAssertion(List<DetailAST> params) {
+        if (params.size() < 2) {
+            return false;
+        }
+        return areIdentical(params.get(0), params.get(1));
+    }
+
+    private boolean isRedundantNullAssertion(List<DetailAST> params) {
+        if (params.isEmpty()) {
+            return false;
+        }
+        return params.get(0).getType() == TokenTypes.LITERAL_NULL;
+    }
+
+    private boolean isRedundantNotNullAssertion(List<DetailAST> params) {
+        if (params.isEmpty()) {
+            return false;
+        }
+        return params.get(0).getType() == TokenTypes.LITERAL_NEW;
+    }
+
+    private boolean areIdentical(DetailAST node1, DetailAST node2) {
+        if (node1 == null && node2 == null) return true;
+        if (node1 == null || node2 == null) return false;
+        if (node1.getType() != node2.getType()) return false;
+
+        String text1 = node1.getText();
+        String text2 = node2.getText();
+        if (text1 != null && !text1.equals(text2)) return false;
+
+        DetailAST child1 = node1.getFirstChild();
+        DetailAST child2 = node2.getFirstChild();
+        while (child1 != null && child2 != null) {
+            if (!areIdentical(child1, child2)) return false;
+            child1 = child1.getNextSibling();
+            child2 = child2.getNextSibling();
+        }
+        return child1 == null && child2 == null;
+    }
+
+    private List<DetailAST> getParameters(DetailAST elist) {
+        List<DetailAST> params = new ArrayList<>();
+        DetailAST param = elist.getFirstChild();
+        while (param != null) {
+            params.add(param);
+            param = param.getNextSibling();
+        }
+        return params;
+    }
+
+    private boolean isAssertionMethod(String methodName) {
+        return methodName.startsWith("assert") || methodName.equals("fail");
+    }
+
+    private boolean isValueNode(DetailAST node) {
+        int type = node.getType();
+        return type == TokenTypes.LITERAL_TRUE || type == TokenTypes.LITERAL_FALSE ||
+               type == TokenTypes.LITERAL_NULL || type == TokenTypes.STRING_LITERAL ||
+               type == TokenTypes.NUM_INT || type == TokenTypes.NUM_LONG ||
+               type == TokenTypes.NUM_FLOAT || type == TokenTypes.NUM_DOUBLE ||
+               type == TokenTypes.IDENT || type == TokenTypes.METHOD_CALL ||
+               type == TokenTypes.DOT || type == TokenTypes.LITERAL_NEW ||
+               type == TokenTypes.PLUS || type == TokenTypes.MINUS ||
+               type == TokenTypes.STAR || type == TokenTypes.DIV ||
+               type == TokenTypes.MOD || type == TokenTypes.EQUAL ||
+               type == TokenTypes.NOT_EQUAL || type == TokenTypes.GT ||
+               type == TokenTypes.LT || type == TokenTypes.GE ||
+               type == TokenTypes.LE || type == TokenTypes.LOR ||
+               type == TokenTypes.LAND || type == TokenTypes.LNOT ||
+               type == TokenTypes.LAMBDA || type == TokenTypes.ARRAY_INIT;
     }
 }

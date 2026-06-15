@@ -1,10 +1,11 @@
 package br.ufba.arieslinter.checks;
 
-import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
+import br.ufba.arieslinter.checks.abstracts.AbstractTestSmellCheck;
+import br.ufba.arieslinter.checks.constants.TestAnnotations;
 
-public class SleepyTestCheck extends AbstractCheck {
+public class SleepyTestCheck extends AbstractTestSmellCheck {
 
     @Override
     public int[] getAcceptableTokens() {
@@ -26,8 +27,8 @@ public class SleepyTestCheck extends AbstractCheck {
         if (isSleepCall(ast)) {
             DetailAST enclosingMethod = findEnclosingMethodDef(ast);
 
-            if (enclosingMethod != null && hasAnnotation(enclosingMethod, "Test")) {
-                log(ast.getLineNo(), "Sleepy Test detected: using 'sleep' in tests.");
+            if (enclosingMethod != null && hasAnnotation(enclosingMethod, TestAnnotations.TEST)) {
+                log(ast.getLineNo(), "Sleepy Test detected: never use 'sleep' in tests.");
             }
         }
     }
@@ -57,7 +58,7 @@ public class SleepyTestCheck extends AbstractCheck {
             }
             parent = parent.getParent();
         }
-        
+
         return null;
     }
 
@@ -95,14 +96,14 @@ public class SleepyTestCheck extends AbstractCheck {
         return name.toString();
     }
 
-    // Métodu Auxiliar
-    private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
+    protected boolean hasAnnotation(DetailAST methodAst, String annotationName) {
         DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
         if (modifiers != null) {
             for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
                 if (child.getType() == TokenTypes.ANNOTATION) {
                     String fullAnnotationName = getFullAnnotationName(child);
-                    if (fullAnnotationName.endsWith("." + annotationName) || fullAnnotationName.equals(annotationName)) {
+                    if (fullAnnotationName.endsWith("." + annotationName)
+                            || fullAnnotationName.equals(annotationName)) {
                         return true;
                     }
                 }

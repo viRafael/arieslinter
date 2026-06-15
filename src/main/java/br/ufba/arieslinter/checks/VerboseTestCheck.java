@@ -1,13 +1,14 @@
 package br.ufba.arieslinter.checks;
 
 import com.puppycrawl.tools.checkstyle.StatelessCheck;
-import com.puppycrawl.tools.checkstyle.api.AbstractCheck;
 import com.puppycrawl.tools.checkstyle.api.DetailAST;
 import com.puppycrawl.tools.checkstyle.api.TokenTypes;
 
+import br.ufba.arieslinter.checks.abstracts.AbstractTestSmellCheck;
+import br.ufba.arieslinter.checks.constants.TestAnnotations;
 
 @StatelessCheck
-public class VerboseTestCheck extends AbstractCheck {
+public class VerboseTestCheck extends AbstractTestSmellCheck {
     private int max;
 
     public VerboseTestCheck() {
@@ -29,11 +30,10 @@ public class VerboseTestCheck extends AbstractCheck {
         return getAcceptableTokens();
     }
 
-
     @Override
     public void visitToken(DetailAST ast) {
         DetailAST slist = ast.findFirstToken(TokenTypes.SLIST);
-        boolean hasTestAnnotation = hasAnnotation(ast, "Test");
+        boolean hasTestAnnotation = hasAnyAnnotation(ast, TestAnnotations.ALL_TEST_ANNOTATIONS);
 
         if (slist != null && hasTestAnnotation == true) {
             // Encontra a chave de fechamento '}' (último filho do SLIST)
@@ -48,26 +48,4 @@ public class VerboseTestCheck extends AbstractCheck {
             }
         }
     }
-
-    public void setMax(int max) {
-        this.max = max;
-    }
-
-    private boolean hasAnnotation(DetailAST methodAst, String annotationName) {
-        DetailAST modifiers = methodAst.findFirstToken(TokenTypes.MODIFIERS);
-
-        if (modifiers != null) {
-            for (DetailAST child = modifiers.getFirstChild(); child != null; child = child.getNextSibling()) {
-                if (child.getType() == TokenTypes.ANNOTATION) {
-                    DetailAST annotationIdent = child.findFirstToken(TokenTypes.IDENT);
-                    
-                    if (annotationIdent != null && annotationIdent.getText().equals(annotationName)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
 }
