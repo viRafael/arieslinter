@@ -61,8 +61,8 @@ public class ConstructorInitializationCheck extends AbstractTestSmellCheck {
         while (child != null) {
             if (child.getType() == TokenTypes.CTOR_DEF) {
                 log(child.getLineNo(),
-                    "Constructor Initialization: Test class ''{0}'' defines a constructor. "
-                        + "Use @Before/@BeforeEach for field initialization instead.",
+                    "Constructor Initialization: test class ''{0}'' defines a constructor, "
+                        + "use @Before or @BeforeEach for field initialization instead.",
                     className);
             }
             child = child.getNextSibling();

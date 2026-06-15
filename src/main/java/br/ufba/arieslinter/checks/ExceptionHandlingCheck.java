@@ -33,30 +33,34 @@ public class ExceptionHandlingCheck extends AbstractTestSmellCheck {
         if (methodBody == null)
             return;
 
-        boolean hasCatch = containsToken(methodBody, TokenTypes.LITERAL_CATCH);
-        boolean hasThrow = containsToken(methodBody, TokenTypes.LITERAL_THROW);
-
-        if (hasCatch || hasThrow) {
-            log(ast.getLineNo(), "Exception Handling: Test method contains a catch clause or a throw statement. "
-                    + "Use JUnit''s built-in exception handling instead.");
+        if (hasExceptionHandling(methodBody)) {
+            log(ast.getLineNo(), "Exception Handling: test method contains a try block, a catch clause, or a throw statement; "
+                    + "use JUnit''s built-in exception handling instead.");
         }
     }
 
     /**
-     * Verifica se existe um token específico dentro do nó fornecido
-     * (recursivamente).
+     * Verifica se o método possui tratamento de exceção (try, catch ou throw).
      */
-    private boolean containsToken(DetailAST node, int tokenType) {
+    private boolean hasExceptionHandling(DetailAST node) {
         DetailAST current = node.getFirstChild();
 
         while (current != null) {
-            if (current.getType() == tokenType) {
+            if (current.getType() == TokenTypes.LITERAL_CATCH) {
                 return true;
             }
 
-            // Recursão para filhos
+            if (current.getType() == TokenTypes.LITERAL_THROW) {
+                return true;
+            }
+
+            if (current.getType() == TokenTypes.LITERAL_TRY) {
+                return true;
+            }
+
+            // Recursão para nós filhos
             if (current.hasChildren()) {
-                if (containsToken(current, tokenType)) {
+                if (hasExceptionHandling(current)) {
                     return true;
                 }
             }

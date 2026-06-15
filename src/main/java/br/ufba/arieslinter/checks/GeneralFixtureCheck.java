@@ -311,13 +311,13 @@ public class GeneralFixtureCheck extends AbstractTestSmellCheck {
             // Se nem todos os testes usam, é General Fixture
             if (testsUsingField < totalTests && testsUsingField > 0) {
                 log(setupLine,
-                        "General Fixture: Field ''{0}'' initialized in setUp() but only used by {1} of {2} test methods. "
-                                + "Consider moving initialization to individual tests that need it.",
+                        "General Fixture: field ''{0}'' initialized in setUp() but only used by {1} of {2} test methods, "
+                                + "move initialization to individual tests that need it.",
                         field, testsUsingField, totalTests);
             } else if (testsUsingField == 0) {
                 log(setupLine,
-                        "General Fixture: Field ''{0}'' initialized in setUp() but not used by any test method. "
-                                + "Remove unused initialization.",
+                        "General Fixture: field ''{0}'' initialized in setUp() but not used by any test method, "
+                                + "remove unused initialization.",
                         field);
             }
         }
