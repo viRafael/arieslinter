@@ -68,25 +68,25 @@ Create a `checkstyle.xml` configuration file at the root of the project you want
 <module name="Checker">
     <module name="TreeWalker">
         <!-- Register Arieslinter custom checks -->
-        <module name="br.ufba.arieslinter.checks.AssertionRouletteTestCheck"/>
-        <module name="br.ufba.arieslinter.checks.ConditionalTestLogicCheck"/>
-        <module name="br.ufba.arieslinter.checks.ConstructorInitializationCheck"/>
-        <module name="br.ufba.arieslinter.checks.DuplicateAssertCheck"/>
-        <module name="br.ufba.arieslinter.checks.EagerTestCheck"/>
-        <module name="br.ufba.arieslinter.checks.EmptyTestCheck"/>
-        <module name="br.ufba.arieslinter.checks.ExceptionHandlingCheck"/>
-        <module name="br.ufba.arieslinter.checks.GeneralFixtureCheck"/>
-        <module name="br.ufba.arieslinter.checks.IgnoredTestCheck"/>
-        <module name="br.ufba.arieslinter.checks.LazyTestCheck"/>
-        <module name="br.ufba.arieslinter.checks.MagicNumberCheck"/>
-        <module name="br.ufba.arieslinter.checks.MysteryGuestCheck"/>
-        <module name="br.ufba.arieslinter.checks.RedundantAssertionCheck"/>
-        <module name="br.ufba.arieslinter.checks.RedundantPrintCheck"/>
-        <module name="br.ufba.arieslinter.checks.ResourceOptimismCheck"/>
-        <module name="br.ufba.arieslinter.checks.SensitiveEqualityCheck"/>
-        <module name="br.ufba.arieslinter.checks.SleepyTestCheck"/>
-        <module name="br.ufba.arieslinter.checks.UnknownTestCheck"/>
-        <module name="br.ufba.arieslinter.checks.VerboseTestCheck"/>
+        <module name="br.ufba.arieslinter.checks.AssertionRouletteTestCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.ConditionalTestLogicCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.ConstructorInitializationCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.DuplicateAssertCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.EagerTestCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.EmptyTestCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.ExceptionHandlingCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.GeneralFixtureCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.IgnoredTestCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.LazyTestCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.MagicNumberCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.MysteryGuestCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.RedundantAssertionCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.RedundantPrintCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.ResourceOptimismCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.SensitiveEqualityCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.SleepyTestCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.UnknownTestCheck"><property name="severity" value="warning"/></module>
+        <module name="br.ufba.arieslinter.checks.VerboseTestCheck"><property name="severity" value="warning"/></module>
     </module>
 </module>
 ```
