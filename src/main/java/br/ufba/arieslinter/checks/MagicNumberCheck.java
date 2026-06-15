@@ -37,7 +37,7 @@ public class MagicNumberCheck extends AbstractTestSmellCheck {
         }
 
         if (isInTestMethod(ast) && isInMethodArgumentOrAssert(ast)) {
-            log(ast.getLineNo(), "Magic number detected: use a variable with a self-expanatory name");
+            log(ast.getLineNo(), "Magic number detected: use a variable with a self-expanatory name instead of the number");
         }
     }
 
