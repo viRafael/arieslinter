@@ -34,8 +34,8 @@ public class ExceptionHandlingCheck extends AbstractTestSmellCheck {
             return;
 
         if (hasExceptionHandling(methodBody)) {
-            log(ast.getLineNo(), "Exception Handling: Test method contains a try block, a catch clause, or a throw statement. "
-                    + "Use JUnit''s built-in exception handling instead.");
+            log(ast.getLineNo(), "Exception Handling: test method contains a try block, a catch clause, or a throw statement; "
+                    + "use JUnit''s built-in exception handling instead.");
         }
     }
 

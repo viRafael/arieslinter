@@ -100,8 +100,8 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
             if (className != null && isExternalResource(className)) {
                 if (!isInsideMockCall(node) && !reportedResources.contains(className)) {
                     log(node.getLineNo(),
-                            "Mystery Guest: Test instantiates external resource ''{0}''. "
-                                    + "Use mocks or in-memory alternatives instead.",
+                            "Mystery Guest: Test instantiates external resource ''{0}'', "
+                                    + "use mocks or in-memory alternatives instead.",
                             className);
                     reportedResources.add(className);
                 }
@@ -114,8 +114,8 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
             if (typeName != null && isExternalResource(typeName)) {
                 if (!isMocked(node) && !reportedResources.contains(typeName)) {
                     log(node.getLineNo(),
-                            "Mystery Guest: Test declares external resource variable of type ''{0}''. "
-                                    + "Use mocks or in-memory alternatives instead.",
+                            "Mystery Guest: Test declares external resource variable of type ''{0}'', "
+                                    + "use mocks or in-memory alternatives instead.",
                             typeName);
                     reportedResources.add(typeName);
                 }
@@ -128,8 +128,8 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
             if (typeName != null && isExternalResource(typeName)) {
                 if (!reportedResources.contains(typeName)) {
                     log(node.getLineNo(),
-                            "Mystery Guest: Test uses external resource parameter of type ''{0}''. "
-                                    + "Use mocks or in-memory alternatives instead.",
+                            "Mystery Guest: Test uses external resource parameter of type ''{0}'', "
+                                    + "use mocks or in-memory alternatives instead.",
                             typeName);
                     reportedResources.add(typeName);
                 }
@@ -145,8 +145,8 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
                     String targetName = target.getText();
                     if (isExternalResource(targetName) && !reportedResources.contains(targetName)) {
                         log(node.getLineNo(),
-                                "Mystery Guest: Test calls method on external resource class ''{0}''. "
-                                        + "Use mocks or in-memory alternatives instead.",
+                                "Mystery Guest: Test calls method on external resource class ''{0}'', "
+                                        + "use mocks or in-memory alternatives instead.",
                                 targetName);
                         reportedResources.add(targetName);
                     }
@@ -162,8 +162,8 @@ public class MysteryGuestCheck extends AbstractTestSmellCheck {
                 String typeName = getTypeName(fieldDef);
                 if (typeName != null && !reportedResources.contains(name)) {
                     log(node.getLineNo(),
-                            "Mystery Guest: Test utilizes class field ''{0}'' of external resource type ''{1}''. "
-                                    + "Use mocks or in-memory alternatives instead.",
+                            "Mystery Guest: Test utilizes class field ''{0}'' of external resource type ''{1}'', "
+                                    + "use mocks or in-memory alternatives instead.",
                             name, typeName);
                     reportedResources.add(name);
                 }

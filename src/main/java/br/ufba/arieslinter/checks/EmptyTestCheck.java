@@ -32,8 +32,8 @@ public class EmptyTestCheck extends AbstractTestSmellCheck {
 
         if (isEmptyTest(ast)) {
             log(ast.getLineNo(),
-                    "Empty Test: Test method ''{0}'' contains no executable statements. "
-                            + "Either implement the test or remove it to avoid false test coverage.",
+                    "Empty Test: test method ''{0}'' contains no executable statements, "
+                            + "either implement the test or remove it to avoid false test coverage.",
                     getMethodName(ast));
         }
     }

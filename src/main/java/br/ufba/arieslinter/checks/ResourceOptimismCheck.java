@@ -69,8 +69,8 @@ public class ResourceOptimismCheck extends AbstractTestSmellCheck {
             String varName = entry.getKey();
             if (!checkedVariables.contains(varName)) {
                 log(entry.getValue().getLineNo(),
-                        "Resource Optimism: File variable ''{0}'' is utilized without checking existence. "
-                                + "Call exists(), isFile(), or notExists() before using it.",
+                        "Resource Optimism: File variable ''{0}'' is utilized without checking existence; "
+                                + "call exists(), isFile(), or notExists() before using it.",
                         varName);
             }
         }
@@ -79,8 +79,8 @@ public class ResourceOptimismCheck extends AbstractTestSmellCheck {
         for (DetailAST newAst : anonymousInstantiations) {
             if (!checkedInstantiations.contains(newAst)) {
                 log(newAst.getLineNo(),
-                        "Resource Optimism: Anonymous File instance is utilized without checking existence. "
-                                + "Call exists(), isFile(), or notExists() before using it.");
+                        "Resource Optimism: Anonymous File instance is utilized without checking existence; "
+                                + "call exists(), isFile(), or notExists() before using it.");
             }
         }
     }

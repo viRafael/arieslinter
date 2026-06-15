@@ -84,8 +84,8 @@ public class RedundantAssertionCheck extends AbstractTestSmellCheck {
         boolean isRedundant = checkRedundancy(methodName, params);
 
         if (isRedundant) {
-            log(methodCall.getLineNo(), "Redundant Assertion: ''{0}'' compares identical values. " +
-                    "This assertion will always pass/fail and provides no value.",
+            log(methodCall.getLineNo(), "Redundant Assertion: ''{0}'' compares identical values, " +
+                    "remove it.",
                     methodName);
         }
     }
