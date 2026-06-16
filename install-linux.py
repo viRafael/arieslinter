@@ -73,6 +73,27 @@ def check_vscode_extensions():
         "shengchen.vscode-checkstyle": "Checkstyle for Java"
     }
     missing = dict(required)
+    
+    # Try querying the CLI first for accurate results (active/installed extensions only)
+    installed = set()
+    for cmd in ["code", "code-oss"]:
+        try:
+            res = subprocess.run([cmd, "--list-extensions"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    if line.strip():
+                        installed.add(line.strip().lower())
+                break
+        except Exception:
+            continue
+            
+    if installed:
+        for ext_id in list(missing.keys()):
+            if ext_id.lower() in installed:
+                missing.pop(ext_id, None)
+        return missing
+
+    # Fallback to directory scanning if CLI query fails
     ext_dirs = [
         os.path.expanduser("~/.vscode/extensions"),
         os.path.expanduser("~/.vscode-oss/extensions")
@@ -88,6 +109,51 @@ def check_vscode_extensions():
             except Exception:
                 pass
     return missing
+
+def get_disabled_vscode_extensions():
+    disabled = set()
+    try:
+        import sqlite3
+        base_dirs = [
+            os.path.expanduser("~/.config/Code"),
+            os.path.expanduser("~/.config/Code - OSS"),
+            os.path.expanduser("~/.config/VSCodium"),
+            os.path.expanduser("~/Library/Application Support/Code")
+        ]
+        for base in base_dirs:
+            if not os.path.exists(base):
+                continue
+            db_paths = [
+                os.path.join(base, "User", "globalStorage", "state.vscdb")
+            ]
+            profiles_dir = os.path.join(base, "User", "profiles")
+            if os.path.exists(profiles_dir):
+                try:
+                    for entry in os.listdir(profiles_dir):
+                        p_dir = os.path.join(profiles_dir, entry)
+                        if os.path.isdir(p_dir):
+                            db_paths.append(os.path.join(p_dir, "globalStorage", "state.vscdb"))
+                except Exception:
+                    pass
+            for db_path in db_paths:
+                if os.path.exists(db_path):
+                    try:
+                        conn = sqlite3.connect(db_path)
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT value FROM ItemTable WHERE key = 'extensionsIdentifiers/disabled'")
+                        row = cursor.fetchone()
+                        if row:
+                            disabled_list = json.loads(row[0])
+                            for item in disabled_list:
+                                ext_id = item.get("id")
+                                if ext_id:
+                                    disabled.add(ext_id.lower())
+                        conn.close()
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+    return disabled
 
 def install_vscode_extensions(extensions_to_install):
     installed_any = False
@@ -262,8 +328,24 @@ def main():
         
     # VS Code extensions check
     missing_exts = check_vscode_extensions()
+    disabled_exts = get_disabled_vscode_extensions()
+    
+    required = {
+        "vscjava.vscode-java-pack": "Extension Pack for Java (Microsoft)",
+        "shengchen.vscode-checkstyle": "Checkstyle for Java"
+    }
+    installed_disabled = []
+    for ext_id, ext_name in required.items():
+        if ext_id not in missing_exts and ext_id.lower() in disabled_exts:
+            installed_disabled.append((ext_id, ext_name))
+            
     if not missing_exts:
-        print(f"{COLOR_SUCCESS}[{ICON_CHECK}] All required VS Code extensions are installed.{COLOR_RESET}")
+        if installed_disabled:
+            print(f"{COLOR_WARN}[{ICON_WARN}] All required VS Code extensions are installed, but some are DISABLED:{COLOR_RESET}")
+            for ext_id, ext_name in installed_disabled:
+                print(f"   - {ext_name} ({ext_id}) -> {COLOR_ERROR}Please enable it manually in VS Code!{COLOR_RESET}")
+        else:
+            print(f"{COLOR_SUCCESS}[{ICON_CHECK}] All required VS Code extensions are installed and enabled.{COLOR_RESET}")
     else:
         print(f"{COLOR_WARN}[{ICON_WARN}] The following VS Code extensions are missing:")
         for ext_id, ext_name in missing_exts.items():
@@ -271,6 +353,11 @@ def main():
         ans = input("   Do you want to install them automatically? [y/N]: ").strip().lower()
         if ans == 'y':
             install_vscode_extensions(missing_exts)
+            
+        if installed_disabled:
+            print(f"\n{COLOR_WARN}[{ICON_WARN}] Note: The following extensions are installed but DISABLED. Please enable them manually in VS Code:{COLOR_RESET}")
+            for ext_id, ext_name in installed_disabled:
+                print(f"   - {ext_name} ({ext_id})")
             
     # IntelliJ Checkstyle check
     if check_intellij_plugin():
