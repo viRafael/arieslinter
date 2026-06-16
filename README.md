@@ -38,10 +38,38 @@ Arieslinter currently supports **17 rules** to identify test smell patterns that
 
 ---
 
-## ⚙️ Installation
+## ⚙️ Installation & Setup
 
-To build the Arieslinter JAR and install it into your local Maven cache (`~/.m2`):
+Choose one of the following methods to install and configure Arieslinter in your project:
 
+### 🚀 Option 1: Quick Automated Install (Recommended)
+
+Run the appropriate command in your terminal to automatically check your environment, install necessary IDE plugins (Checkstyle + Java support), download the rules JAR, write the `checkstyle.xml` file, and configure your IDE workspace settings:
+
+#### 🐧 Linux & macOS
+```bash
+curl -sSL https://raw.githubusercontent.com/viRafael/arieslinter/main/install-linux.py | python3
+```
+
+> [!NOTE]
+> The script automatically detects if standard input is a pipe (when run via `curl | python3`) and re-binds it to `/dev/tty` so you can interact with the installation menus seamlessly.
+
+#### 🪟 Windows (CMD / PowerShell)
+```cmd
+curl -sSL -o install-win.py https://raw.githubusercontent.com/viRafael/arieslinter/main/install-win.py && python install-win.py
+```
+
+> [!TIP]
+> This downloads the script locally first, then executes it normally. This is the most robust way to run Python interactively on Windows.
+
+---
+
+### 🛠️ Option 2: Manual Installation & Setup
+
+If you prefer to compile the JAR and configure your environment manually, follow these steps:
+
+#### 1. Build and install the Arieslinter JAR
+Build the Arieslinter JAR and install it into your local Maven cache (`~/.m2`):
 ```bash
 # Clone the repository
 git clone https://github.com/viRafael/arieslinter.git
@@ -54,16 +82,13 @@ mvn clean install
 This compiles the Checkstyle rules and produces a reusable artifact located at:
 `~/.m2/repository/br/ufba/arieslinter/1.0/arieslinter-1.0.jar`
 
----
-
-## 🛠️ Configuration
-
-Create a `checkstyle.xml` configuration file at the root of the project you want to analyze:
+#### 2. Create the `checkstyle.xml` configuration file
+Create a `checkstyle.xml` configuration file at the root of the project you want to analyze with the following content:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE module PUBLIC "-//Puppy Crawl//DTD Check Configuration 1.3//EN"
-        "http://checkstyle.sourceforge.net/dtds/configuration_1_3.dtd">
+        "https://checkstyle.org/dtds/configuration_1_3.dtd">
 
 <module name="Checker">
     <module name="TreeWalker">
@@ -72,12 +97,10 @@ Create a `checkstyle.xml` configuration file at the root of the project you want
         <module name="br.ufba.arieslinter.checks.ConditionalTestLogicCheck"><property name="severity" value="warning"/></module>
         <module name="br.ufba.arieslinter.checks.ConstructorInitializationCheck"><property name="severity" value="warning"/></module>
         <module name="br.ufba.arieslinter.checks.DuplicateAssertCheck"><property name="severity" value="warning"/></module>
-        <module name="br.ufba.arieslinter.checks.EagerTestCheck"><property name="severity" value="warning"/></module>
         <module name="br.ufba.arieslinter.checks.EmptyTestCheck"><property name="severity" value="warning"/></module>
         <module name="br.ufba.arieslinter.checks.ExceptionHandlingCheck"><property name="severity" value="warning"/></module>
         <module name="br.ufba.arieslinter.checks.GeneralFixtureCheck"><property name="severity" value="warning"/></module>
         <module name="br.ufba.arieslinter.checks.IgnoredTestCheck"><property name="severity" value="warning"/></module>
-        <module name="br.ufba.arieslinter.checks.LazyTestCheck"><property name="severity" value="warning"/></module>
         <module name="br.ufba.arieslinter.checks.MagicNumberCheck"><property name="severity" value="warning"/></module>
         <module name="br.ufba.arieslinter.checks.MysteryGuestCheck"><property name="severity" value="warning"/></module>
         <module name="br.ufba.arieslinter.checks.RedundantAssertionCheck"><property name="severity" value="warning"/></module>
@@ -91,12 +114,9 @@ Create a `checkstyle.xml` configuration file at the root of the project you want
 </module>
 ```
 
----
+#### 3. IDE Integration
 
-## 💻 IDE Integration
-
-### Visual Studio Code
-
+##### Visual Studio Code
 1. Install the [Checkstyle for Java](https://marketplace.visualstudio.com/items?itemName=shengchen.vscode-checkstyle) extension.
 2. Open your VS Code `settings.json` and add:
    ```json
@@ -110,10 +130,7 @@ Create a `checkstyle.xml` configuration file at the root of the project you want
    > - **Linux/macOS:** `/home/username/.m2/repository/...`
    > - **Windows:** `C:/Users/username/.m2/repository/...`
 
----
-
-### IntelliJ IDEA
-
+##### IntelliJ IDEA
 1. Install the [CheckStyle-IDEA](https://plugins.jetbrains.com/plugin/1065-checkstyle-idea) plugin.
 2. Navigate to **Settings** (or **Preferences** on macOS) → **Tools** → **Checkstyle**.
 3. Under **Configuration File**, click the `+` button and configure:
@@ -125,6 +142,7 @@ Create a `checkstyle.xml` configuration file at the root of the project you want
    - **Windows:** `C:\Users\{user}\.m2\repository\br\ufba\arieslinter\1.0\arieslinter-1.0.jar`
 
 ---
+
 
 ## 🎓 Research & Citation
 
