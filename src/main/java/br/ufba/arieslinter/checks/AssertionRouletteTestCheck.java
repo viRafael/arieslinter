@@ -39,7 +39,7 @@ public class AssertionRouletteTestCheck extends AbstractTestSmellCheck {
     if (assertionsWithoutMessage.size() >= 2) {
       log(ast.getLineNo(),
           "Assertion Roulette: test method has {0} assertions without explanatory messages, "
-              + "add a message as the first parameter to identify which assertion failed.",
+              + "add a message in the assertions to identify which assertion failed.",
           assertionsWithoutMessage.size());
     }
   }
