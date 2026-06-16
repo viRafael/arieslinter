@@ -181,6 +181,24 @@ def get_disabled_vscode_extensions():
         pass
     return disabled
 
+def print_disabled_extensions_warning(installed_disabled):
+    if not installed_disabled:
+        return
+    w = 64
+    print(f"\n{COLOR_ERROR}┌" + "─"*w + f"┐{COLOR_RESET}")
+    print(f"{COLOR_ERROR}│ " + "ATTENTION: DISABLED VS CODE EXTENSION(S) DETECTED".ljust(w-2) + f" │{COLOR_RESET}")
+    print(f"{COLOR_ERROR}├" + "─"*w + f"┤{COLOR_RESET}")
+    print(f"{COLOR_ERROR}│ " + "The following required extension(s) are currently".ljust(w-2) + f" │{COLOR_RESET}")
+    print(f"{COLOR_ERROR}│ " + "DISABLED in your VS Code profile:".ljust(w-2) + f" │{COLOR_RESET}")
+    print(f"{COLOR_ERROR}│ " + "".ljust(w-2) + f" │{COLOR_RESET}")
+    for ext_id, ext_name in installed_disabled:
+        line = f"  • {ext_name} ({ext_id})"
+        print(f"{COLOR_ERROR}│ " + line.ljust(w-2) + f" │{COLOR_RESET}")
+    print(f"{COLOR_ERROR}│ " + "".ljust(w-2) + f" │{COLOR_RESET}")
+    print(f"{COLOR_ERROR}│ " + "Please open VS Code, go to the Extensions tab (Ctrl+Shift+X),".ljust(w-2) + f" │{COLOR_RESET}")
+    print(f"{COLOR_ERROR}│ " + "search for the extension(s) above and click 'Enable'.".ljust(w-2) + f" │{COLOR_RESET}")
+    print(f"{COLOR_ERROR}└" + "─"*w + f"┘{COLOR_RESET}\n")
+
 def install_vscode_extensions(extensions_to_install, profile_name=None):
     installed_any = False
     exts_copy = dict(extensions_to_install)
@@ -395,9 +413,7 @@ def main():
             
     if not missing_exts:
         if installed_disabled:
-            print(f"{COLOR_WARN}{ICON_WARN} All required VS Code extensions are installed, but some are DISABLED:{COLOR_RESET}")
-            for ext_id, ext_name in installed_disabled:
-                print(f"   - {ext_name} ({ext_id}) -> {COLOR_ERROR}Please enable it manually in VS Code!{COLOR_RESET}")
+            print_disabled_extensions_warning(installed_disabled)
         else:
             print(f"{COLOR_SUCCESS}{ICON_CHECK} All required VS Code extensions are installed and enabled.{COLOR_RESET}")
     else:
@@ -409,9 +425,7 @@ def main():
             install_vscode_extensions(missing_exts, profile_name)
             
         if installed_disabled:
-            print(f"\n{COLOR_WARN}{ICON_WARN} Note: The following extensions are installed but DISABLED. Please enable them manually in VS Code:{COLOR_RESET}")
-            for ext_id, ext_name in installed_disabled:
-                print(f"   - {ext_name} ({ext_id})")
+            print_disabled_extensions_warning(installed_disabled)
             
     # IntelliJ Checkstyle check
     if check_intellij_plugin():
