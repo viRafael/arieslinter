@@ -160,32 +160,7 @@ def download_jar(target_path):
         print(f"{COLOR_ERROR}{ICON_CROSS} Error downloading JAR: {e}{COLOR_RESET}")
         return False
 
-def build_from_source(target_path):
-    temp_dir = os.environ.get("TEMP", "C:\\Temp")
-    build_dir = os.path.join(temp_dir, "arieslinter_build")
-    
-    print(f"{COLOR_INFO}{ICON_INFO} Cloning repository into {build_dir}...{COLOR_RESET}")
-    # Remove directory on Windows safely
-    if os.path.exists(build_dir):
-        subprocess.run(f'rmdir /s /q "{build_dir}"', shell=True)
-        
-    clone_res = subprocess.run(f'git clone https://github.com/viRafael/arieslinter.git "{build_dir}"', shell=True)
-    if clone_res.returncode != 0:
-        print(f"{COLOR_ERROR}{ICON_CROSS} Failed to clone repository.{COLOR_RESET}")
-        return False
-        
-    print(f"{COLOR_INFO}{ICON_INFO} Running 'mvn clean install' to build custom checks JAR...{COLOR_RESET}")
-    build_res = subprocess.run("mvn clean install", cwd=build_dir, shell=True)
-    
-    if os.path.exists(build_dir):
-        subprocess.run(f'rmdir /s /q "{build_dir}"', shell=True)
-        
-    if build_res.returncode == 0:
-        print(f"{COLOR_SUCCESS}{ICON_CHECK} Maven build completed successfully.{COLOR_RESET}")
-        return os.path.exists(target_path)
-    else:
-        print(f"{COLOR_ERROR}{ICON_CROSS} Maven build failed.{COLOR_RESET}")
-        return False
+
 
 def configure_vscode(project_path, jar_path):
     settings_dir = os.path.join(project_path, ".vscode")
@@ -310,29 +285,13 @@ def main():
         
     print("")
     
-    # Step 2: Download or Build JAR
-    print(f"{COLOR_TITLE}2. Obtain Arieslinter JAR{COLOR_RESET}")
+    # Step 2: Download JAR
+    print(f"{COLOR_TITLE}2. Download Arieslinter JAR{COLOR_RESET}")
     jar_target = os.path.expanduser("~/.m2/repository/br/ufba/arieslinter/1.0/arieslinter-1.0.jar")
     print(f"   Target Location: {COLOR_MUTED}{jar_target}{COLOR_RESET}\n")
-    print(f"   [1] Download pre-compiled stable JAR from GitHub Releases {COLOR_SUCCESS}(Recommended){COLOR_RESET}")
-    print(f"   [2] Compile and build latest JAR from GitHub source {COLOR_WARN}(Requires Maven){COLOR_RESET}")
     
-    choice = ""
-    while choice not in ["1", "2"]:
-        choice = input("\n   Select option [1-2]: ").strip()
-        
-    if choice == "1":
-        if not download_jar(jar_target):
-            sys.exit(1)
-    else:
-        # Check Maven dependency
-        try:
-            subprocess.run("mvn -version", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, shell=True)
-        except Exception:
-            print(f"{COLOR_ERROR}{ICON_CROSS} Maven ('mvn') is required to build from source but was not found.{COLOR_RESET}")
-            sys.exit(1)
-        if not build_from_source(jar_target):
-            sys.exit(1)
+    if not download_jar(jar_target):
+        sys.exit(1)
             
     print("")
     
@@ -340,7 +299,7 @@ def main():
     print(f"{COLOR_TITLE}3. Target Project Configuration{COLOR_RESET}")
     proj_path = ""
     while not proj_path:
-        proj_path = input("   Enter the absolute path to your Java project [default: current dir]: ").strip()
+        proj_path = input("   Enter the absolute path where you want to run the AriesLinter [default: current dir]: ").strip()
         if not proj_path:
             proj_path = os.getcwd()
         proj_path = os.path.abspath(os.path.expanduser(proj_path))
@@ -383,4 +342,16 @@ def main():
     print(f"   Enjoy real-time test smell analysis with {COLOR_ACCENT}Arieslinter{COLOR_RESET}! 🐞\n")
 
 if __name__ == "__main__":
-    main()
+    import signal
+    
+    def handle_exit(sig=None, frame=None):
+        print(f"\n\n{COLOR_WARN}[{ICON_WARN}] Installation aborted by user. Exiting...{COLOR_RESET}\n")
+        sys.exit(0)
+        
+    if hasattr(signal, 'SIGTSTP'):
+        signal.signal(signal.SIGTSTP, handle_exit)
+        
+    try:
+        main()
+    except (KeyboardInterrupt, EOFError):
+        handle_exit()
