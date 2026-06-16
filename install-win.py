@@ -67,7 +67,38 @@ def print_header():
     print(f"│     Real-Time Static Analysis for Java Test Smells     │")
     print(f"└────────────────────────────────────────────────────────┘{COLOR_RESET}\n")
 
-def check_vscode_extensions():
+def get_vscode_profile(project_path):
+    import urllib.parse
+    base_dirs = []
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        base_dirs.append(os.path.join(appdata, "Code"))
+    for base in base_dirs:
+        if not os.path.exists(base):
+            continue
+        proj_uri = "file://" + urllib.parse.quote(project_path.replace("\\", "/"))
+        if proj_uri.startswith("file:////"):
+            proj_uri = "file:///" + proj_uri[9:]
+        elif proj_uri.startswith("file://") and not proj_uri.startswith("file:///"):
+            proj_uri = "file:///" + proj_uri[7:]
+        storage_json_path = os.path.join(base, "User", "globalStorage", "storage.json")
+        if os.path.exists(storage_json_path):
+            try:
+                with open(storage_json_path, 'r', encoding='utf-8') as f:
+                    storage_data = json.load(f)
+                    workspaces = storage_data.get("profileAssociations", {}).get("workspaces", {})
+                    for wk_uri, prof_id in workspaces.items():
+                        if wk_uri.lower() == proj_uri.lower():
+                            profiles = storage_data.get("userDataProfiles", [])
+                            for p in profiles:
+                                if p.get("location") == prof_id:
+                                    return p.get("name")
+                            return prof_id
+            except Exception:
+                pass
+    return None
+
+def check_vscode_extensions(profile_name=None):
     required = {
         "vscjava.vscode-java-pack": "Extension Pack for Java (Microsoft)",
         "shengchen.vscode-checkstyle": "Checkstyle for Java"
@@ -77,7 +108,10 @@ def check_vscode_extensions():
     # Try querying the CLI first for accurate results (active/installed extensions only)
     installed = set()
     try:
-        res = subprocess.run("code --list-extensions", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        cmd = "code --list-extensions"
+        if profile_name:
+            cmd += f' --profile "{profile_name}"'
+        res = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         if res.returncode == 0:
             for line in res.stdout.splitlines():
                 if line.strip():
@@ -147,15 +181,17 @@ def get_disabled_vscode_extensions():
         pass
     return disabled
 
-def install_vscode_extensions(extensions_to_install):
+def install_vscode_extensions(extensions_to_install, profile_name=None):
     installed_any = False
     exts_copy = dict(extensions_to_install)
     for ext_id, ext_name in list(exts_copy.items()):
         print(f"{COLOR_INFO}{ICON_INFO} Attempting to install {ext_name} via VS Code CLI...{COLOR_RESET}")
         try:
+            cmd = f'code --install-extension {ext_id}'
+            if profile_name:
+                cmd += f' --profile "{profile_name}"'
             # Use shell=True for windows .cmd wrapper execution
-            res = subprocess.run(f'code --install-extension {ext_id}', 
-                                 shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            res = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if res.returncode == 0:
                 print(f"{COLOR_SUCCESS}{ICON_CHECK} {ext_name} installed successfully.{COLOR_RESET}")
                 exts_copy.pop(ext_id, None)
@@ -313,8 +349,26 @@ def configure_intellij(project_path, jar_path):
 def main():
     print_header()
     
-    # Step 1: Environment & Plugin Checks
-    print(f"{COLOR_TITLE}1. Analyzing Environment & IDE Plugins...{COLOR_RESET}")
+    # Step 1: Target Project Configuration
+    print(f"{COLOR_TITLE}1. Target Project Configuration{COLOR_RESET}")
+    proj_path = ""
+    while not proj_path:
+        proj_path = input("   Enter the absolute path where you want to run the AriesLinter [default: current dir]: ").strip()
+        if not proj_path:
+            proj_path = os.getcwd()
+        proj_path = os.path.abspath(os.path.expanduser(proj_path))
+        if not os.path.exists(proj_path) or not os.path.isdir(proj_path):
+            print(f"{COLOR_ERROR}{ICON_CROSS} Directory does not exist. Please enter a valid path.{COLOR_RESET}")
+            proj_path = ""
+            
+    # Resolve active VS Code profile for this project
+    profile_name = get_vscode_profile(proj_path)
+    if profile_name:
+        print(f"   {COLOR_INFO}{ICON_INFO} Detected active VS Code profile for this project: {COLOR_ACCENT}{profile_name}{COLOR_RESET}")
+    print("")
+    
+    # Step 2: Environment & Plugin Checks
+    print(f"{COLOR_TITLE}2. Analyzing Environment & IDE Plugins...{COLOR_RESET}")
     
     # Python check
     print(f"{COLOR_SUCCESS}{ICON_CHECK} Python 3 is installed.{COLOR_RESET}")
@@ -327,7 +381,7 @@ def main():
         print(f"{COLOR_WARN}{ICON_WARN} Java is NOT installed in your PATH. Please install Java before using Arieslinter.{COLOR_RESET}")
         
     # VS Code extensions check
-    missing_exts = check_vscode_extensions()
+    missing_exts = check_vscode_extensions(profile_name)
     disabled_exts = get_disabled_vscode_extensions()
     
     required = {
@@ -352,7 +406,7 @@ def main():
             print(f"   - {ext_name} ({ext_id})")
         ans = input("   Do you want to install them automatically? [y/N]: ").strip().lower()
         if ans == 'y':
-            install_vscode_extensions(missing_exts)
+            install_vscode_extensions(missing_exts, profile_name)
             
         if installed_disabled:
             print(f"\n{COLOR_WARN}{ICON_WARN} Note: The following extensions are installed but DISABLED. Please enable them manually in VS Code:{COLOR_RESET}")
@@ -368,8 +422,8 @@ def main():
         
     print("")
     
-    # Step 2: Download JAR
-    print(f"{COLOR_TITLE}2. Download Arieslinter JAR{COLOR_RESET}")
+    # Step 3: Download JAR
+    print(f"{COLOR_TITLE}3. Download Arieslinter JAR{COLOR_RESET}")
     jar_target = os.path.expanduser("~/.m2/repository/br/ufba/arieslinter/1.0/arieslinter-1.0.jar")
     print(f"   Target Location: {COLOR_MUTED}{jar_target}{COLOR_RESET}\n")
     
@@ -378,18 +432,6 @@ def main():
             
     print("")
     
-    # Step 3: Project Path & checkstyle.xml Configuration
-    print(f"{COLOR_TITLE}3. Target Project Configuration{COLOR_RESET}")
-    proj_path = ""
-    while not proj_path:
-        proj_path = input("   Enter the absolute path where you want to run the AriesLinter [default: current dir]: ").strip()
-        if not proj_path:
-            proj_path = os.getcwd()
-        proj_path = os.path.abspath(os.path.expanduser(proj_path))
-        if not os.path.exists(proj_path) or not os.path.isdir(proj_path):
-            print(f"{COLOR_ERROR}{ICON_CROSS} Directory does not exist. Please enter a valid path.{COLOR_RESET}")
-            proj_path = ""
-            
     # Write checkstyle.xml
     xml_path = os.path.join(proj_path, "checkstyle.xml")
     try:
