@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: "If you use Arieslinter in your research, please cite the paper."
+title: "AriesLinter: Sniffing Test Smells Before They Happen"
+type: software
+license: MIT
+repository-code: "https://github.com/viRafael/arieslinter"
+authors:
+  - family-names: Rocha
+    given-names: Rafael
+  - family-names: Junior
+    given-names: Eronildo
+  - family-names: Virgínio
+    given-names: Tássio
+  - family-names: Rocha
+    given-names: Larissa
+  - family-names: Bezerra
+    given-names: Carla
+  - family-names: Machado
+    given-names: Ivan
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.16998677
+    description: "Research artifact on Zenodo (snapshot of August 2025; may not match the current release)"
+preferred-citation:
+  type: conference-paper
+  title: "AriesLinter: Sniffing Test Smells Before They Happen"
+  collection-title: "Proceedings of the XXXIX Brazilian Symposium on Software Engineering (SBES 2025)"
+  year: 2025
+  publisher:
+    name: SBC
+  authors:
+    - family-names: Rocha
+      given-names: Rafael
+    - family-names: Junior
+      given-names: Eronildo
+    - family-names: Virgínio
+      given-names: Tássio
+    - family-names: Rocha
+      given-names: Larissa
+    - family-names: Bezerra
+      given-names: Carla
+    - family-names: Machado
+      given-names: Ivan

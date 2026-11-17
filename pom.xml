@@ -2,7 +2,20 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>br.ufba</groupId>
     <artifactId>arieslinter</artifactId>
+    <packaging>jar</packaging>
     <name>Test Smells Linter</name>
+    <description>Checkstyle checks that detect test smells in Java test code.</description>
+    <url>https://github.com/viRafael/arieslinter</url>
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+        </license>
+    </licenses>
+    <scm>
+        <url>https://github.com/viRafael/arieslinter</url>
+        <connection>scm:git:https://github.com/viRafael/arieslinter.git</connection>
+    </scm>
     <build>
         <plugins>
             <plugin>
@@ -23,6 +36,7 @@
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
             <version>10.23.1</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 

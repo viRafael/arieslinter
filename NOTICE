@@ -1,0 +1,17 @@
+Arieslinter
+Copyright (c) 2025 the Arieslinter authors. Licensed under the MIT License (see LICENSE).
+
+Third-party software
+--------------------
+Checkstyle (https://checkstyle.org) - GNU Lesser General Public License v2.1
+  Arieslinter's JAR contains only its own checks and is compiled against Checkstyle, which
+  it needs at run time (provided by your IDE plugin or by the Checkstyle command line).
+  The installer downloads the unmodified "checkstyle-<version>-all.jar" from the upstream
+  GitHub release; its source code and license are available at
+  https://github.com/checkstyle/checkstyle . If you ever redistribute Checkstyle inside an
+  Arieslinter artifact, you must comply with the LGPL-2.1 (license text, notices, source offer).
+
+IDE extensions (installed by the installer from their marketplaces, not redistributed here):
+  Checkstyle for Java (shengchen.vscode-checkstyle), Checkstyle for VS Code (a-st.checkstyle-vscode),
+  Extension Pack for Java (vscjava.vscode-java-pack), CheckStyle-IDEA (JetBrains plugin).
+  Each is governed by its own license.
