@@ -1,2 +1,19 @@
-.vscode/
+# Build output
 target/
+
+# IDE / editor
+.idea/
+*.iml
+.vscode/
+.DS_Store
+.claude/
+
+# Python
+__pycache__/
+*.pyc
+
+# Local artifacts
+*.jar
+*.part
+*.bak
+*.bak-*

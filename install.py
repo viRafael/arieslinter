@@ -1,22 +1,30 @@
 #!/usr/bin/env python3
 """Arieslinter auto-installer (Linux, macOS and Windows).
 
-Usage:
-    Linux/macOS: curl -sSL https://raw.githubusercontent.com/viRafael/arieslinter/main/install.py | python3
-    Windows:     curl -sSL -o install.py https://raw.githubusercontent.com/viRafael/arieslinter/main/install.py && python install.py
+Usage (download, read it, then run it):
+    Linux/macOS: curl -sSL -o install.py https://raw.githubusercontent.com/viRafael/arieslinter/main/install.py && python3 install.py
+    Windows:     curl.exe -sSL -o install.py https://raw.githubusercontent.com/viRafael/arieslinter/main/install.py ; py install.py
+
+Security model: the Arieslinter and Checkstyle JARs are pinned below (URL + SHA-256).
+Nothing is executed before its hash has been verified, and the script only talks to GitHub.
 """
 import sys
 import os
 import argparse
 import hashlib
-import tempfile
 import shutil
+import ssl
 import subprocess
+import tempfile
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 import json
 import re
 import xml.etree.ElementTree as ET
+from datetime import datetime
+from pathlib import Path
 from xml.dom import minidom
 
 IS_WIN = sys.platform.startswith("win")
@@ -29,6 +37,7 @@ try:
         sys.stdin = open('CON' if IS_WIN else '/dev/tty', 'r')
 except Exception:
     pass
+INTERACTIVE = bool(getattr(sys.stdin, "isatty", lambda: False)())
 
 # Make sure unicode output never crashes on legacy Windows consoles
 for _stream in (sys.stdout, sys.stderr):
@@ -41,9 +50,22 @@ for _stream in (sys.stdout, sys.stderr):
 if IS_WIN:
     os.system("")
 
+# ---------------------------------------------------------------------------
+# Pinned artifacts (update these in a reviewed commit when cutting a release)
+# ---------------------------------------------------------------------------
+ARIES_TAG = "1.5"
+ARIES_JAR_NAME = "arieslinter-1.0.jar"
+ARIES_JAR_URL = f"https://github.com/viRafael/arieslinter/releases/download/{ARIES_TAG}/{ARIES_JAR_NAME}"
+ARIES_SHA256 = "7425516c8c9dd4c85844e26cec91e807326e82f44a50e503f38c44c503e7fd26"
+
 CHECKSTYLE_VERSION = "10.23.1"   # same version the Arieslinter JAR is compiled against (pom.xml)
+CHECKSTYLE_JAR_URL = (f"https://github.com/checkstyle/checkstyle/releases/download/"
+                      f"checkstyle-{CHECKSTYLE_VERSION}/checkstyle-{CHECKSTYLE_VERSION}-all.jar")
 CHECKSTYLE_SHA256 = "6c5d14f922e356808b4d92db76d172f7c1d9b582bbbb0d337b0da01ae8ac747f"
 MIN_JAVA = 11                    # minimum Java required by Checkstyle 10.x
+OPEN_VSX_MIN_EDITOR = (1, 144, 0)  # engines.vscode of a-st.checkstyle-vscode 2.0.2
+
+ALLOWED_HOSTS = ("github.com", "githubusercontent.com")
 
 # ANSI Colors
 COLOR_TITLE = "\033[1;38;5;45m"     # Cyan
@@ -115,23 +137,38 @@ EXTENSIONS_BY_MARKETPLACE = {
     },
 }
 
-# Each entry: config dir ("Code" folder name inside the per-OS app data dir),
-# home extensions dir, CLI candidates and the default marketplace.
+APP = "Contents/Resources/app/bin"
+# Each entry: config dir name, home extensions dir, CLI names, extra CLI locations per OS
+# (when the CLI is not in PATH), extra config locations (Flatpak/Snap) and the default marketplace.
 VSCODE_FAMILY = [
     {"id": "code", "name": "VS Code", "cli": ["code"], "config": "Code",
-     "ext_dir": "~/.vscode/extensions", "marketplace": MICROSOFT_MARKETPLACE},
+     "ext_dir": "~/.vscode/extensions", "marketplace": MICROSOFT_MARKETPLACE,
+     "extra_cli": {"mac": [f"/Applications/Visual Studio Code.app/{APP}/code"],
+                   "win": ["%LOCALAPPDATA%/Programs/Microsoft VS Code/bin/code.cmd",
+                           "%ProgramFiles%/Microsoft VS Code/bin/code.cmd"],
+                   "linux": ["/usr/share/code/bin/code", "/snap/bin/code"]},
+     "extra_config": ["~/.var/app/com.visualstudio.code/config/Code", "~/snap/code/current/.config/Code"]},
     {"id": "code-insiders", "name": "VS Code Insiders", "cli": ["code-insiders"], "config": "Code - Insiders",
-     "ext_dir": "~/.vscode-insiders/extensions", "marketplace": MICROSOFT_MARKETPLACE},
+     "ext_dir": "~/.vscode-insiders/extensions", "marketplace": MICROSOFT_MARKETPLACE,
+     "extra_cli": {"mac": [f"/Applications/Visual Studio Code - Insiders.app/{APP}/code-insiders"],
+                   "win": ["%LOCALAPPDATA%/Programs/Microsoft VS Code Insiders/bin/code-insiders.cmd"]}},
     {"id": "code-oss", "name": "Code - OSS", "cli": ["code-oss"], "config": "Code - OSS",
      "ext_dir": "~/.vscode-oss/extensions", "marketplace": OPEN_VSX},
     {"id": "vscodium", "name": "VSCodium", "cli": ["codium", "vscodium"], "config": "VSCodium",
-     "ext_dir": "~/.vscode-oss/extensions", "marketplace": OPEN_VSX},
+     "ext_dir": "~/.vscode-oss/extensions", "marketplace": OPEN_VSX,
+     "extra_cli": {"mac": [f"/Applications/VSCodium.app/{APP}/codium"],
+                   "win": ["%LOCALAPPDATA%/Programs/VSCodium/bin/codium.cmd"]},
+     "extra_config": ["~/.var/app/com.vscodium.codium/config/VSCodium"]},
     {"id": "vscodium-insiders", "name": "VSCodium Insiders", "cli": ["codium-insiders"], "config": "VSCodium - Insiders",
      "ext_dir": "~/.vscode-oss-insiders/extensions", "marketplace": OPEN_VSX},
     {"id": "cursor", "name": "Cursor", "cli": ["cursor"], "config": "Cursor",
-     "ext_dir": "~/.cursor/extensions", "marketplace": OPEN_VSX},
+     "ext_dir": "~/.cursor/extensions", "marketplace": OPEN_VSX,
+     "extra_cli": {"mac": [f"/Applications/Cursor.app/{APP}/cursor"],
+                   "win": ["%LOCALAPPDATA%/Programs/cursor/resources/app/bin/cursor.cmd"]}},
     {"id": "windsurf", "name": "Windsurf", "cli": ["windsurf"], "config": "Windsurf",
-     "ext_dir": "~/.windsurf/extensions", "marketplace": OPEN_VSX},
+     "ext_dir": "~/.windsurf/extensions", "marketplace": OPEN_VSX,
+     "extra_cli": {"mac": [f"/Applications/Windsurf.app/{APP}/windsurf"],
+                   "win": ["%LOCALAPPDATA%/Programs/Windsurf/bin/windsurf.cmd"]}},
 ]
 
 # Candidate roots where a VS Code build keeps resources/app/product.json
@@ -145,13 +182,102 @@ PRODUCT_JSON_RELATIVE = [
     "../Resources/app/product.json",
     "../../Resources/app/product.json",
 ]
-
-
 KNOWN_APP_ROOTS = ["/usr/share/code", "/opt/visual-studio-code", "/usr/lib/code",
                    "/usr/share/codium", "/opt/vscodium-bin", "/usr/lib/code-oss",
                    "/usr/lib/code-insiders", "/opt/code-oss", "/usr/share/code-oss"]
 
+PROFILE_RE = re.compile(r"^[\w .()\-]{1,64}$")
 
+
+# ---------------------------------------------------------------------------
+# Honest reporting: every step records its real outcome here
+# ---------------------------------------------------------------------------
+REPORT = []   # list of (status, label, detail) where status is ok | warn | fail
+
+
+def report(status, label, detail=""):
+    REPORT.append((status, label, detail))
+
+
+class NoTerminal(Exception):
+    """Raised when a prompt is needed but there is no interactive terminal."""
+
+
+def ask(prompt):
+    if not INTERACTIVE:
+        raise NoTerminal()
+    return input(prompt)
+
+
+def sanitize(text):
+    """Strip control characters from externally-provided text before printing it."""
+    return re.sub(r"[\x00-\x1f\x7f]", "?", str(text))
+
+
+# ---------------------------------------------------------------------------
+# Safe process / path helpers
+# ---------------------------------------------------------------------------
+def safe_which(cmd):
+    """Like shutil.which, but on Windows never resolves to the current directory
+    (a planted code.cmd / java.exe next to install.py must not be executed)."""
+    if not IS_WIN:
+        return shutil.which(cmd)
+    cwd = os.path.normcase(os.path.abspath(os.getcwd()))
+    exts = os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";")
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        if not d or os.path.normcase(os.path.abspath(d)) == cwd:
+            continue
+        for e in exts:
+            cand = os.path.join(d, cmd + e.lower())
+            if os.path.isfile(cand):
+                return cand
+            cand = os.path.join(d, cmd + e)
+            if os.path.isfile(cand):
+                return cand
+    return None
+
+
+def ensure_safe_dir(path):
+    if os.path.islink(path):
+        raise OSError(f"refusing to use symlinked directory: {path}")
+    os.makedirs(path, exist_ok=True)
+
+
+def backup_file(path):
+    """Copy path to path.bak-<timestamp>; returns the backup path."""
+    backup = f"{path}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    shutil.copyfile(path, backup)
+    return backup
+
+
+def write_text_safe(path, content):
+    """Atomically write a text file, refusing to write through a symlink."""
+    if os.path.islink(path):
+        raise OSError(f"refusing to write through symlink: {path}")
+    d = os.path.dirname(path) or "."
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".arieslinter-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        if os.path.exists(path):
+            try:
+                shutil.copymode(path, tmp)
+            except OSError:
+                pass
+        else:
+            os.chmod(tmp, 0o644)
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
+# ---------------------------------------------------------------------------
+# IDE detection
+# ---------------------------------------------------------------------------
 def app_data_dir():
     """Per-OS directory where VS Code style editors keep their config."""
     if IS_WIN:
@@ -161,31 +287,45 @@ def app_data_dir():
     return os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
 
 
+def find_config_dir(ide):
+    candidates = [os.path.join(app_data_dir(), ide["config"])]
+    candidates += [os.path.expanduser(p) for p in ide.get("extra_config", [])]
+    for c in candidates:
+        if os.path.isdir(c):
+            return c
+    return candidates[0]
+
+
 def find_cli(ide):
-    """Return (command_name, resolved_path) of the first CLI found in PATH."""
+    """Return (command_name, absolute_path) of the first CLI found, or (None, None)."""
     for cmd in ide["cli"]:
-        path = shutil.which(cmd)
+        path = safe_which(cmd)
         if path:
             return cmd, path
+    for raw in ide.get("extra_cli", {}).get(PLATFORM, []):
+        path = os.path.expandvars(raw)
+        if os.path.isfile(path):
+            return ide["cli"][0], path
     return None, None
 
 
 def detect_marketplace(ide, cli_cmd, cli_path):
     """Best-effort: read product.json of the installed build to learn which
-    extension gallery it uses. Only trusts a product.json whose applicationName
-    matches the CLI command. Falls back to the default of the IDE entry."""
+    extension gallery it uses. Falls back to the default of the IDE entry."""
     default = ide["marketplace"]
+    allowed = set(ide["cli"]) | {cli_cmd}
+    if cli_cmd == "code":
+        allowed.add("code-oss")      # Arch/Fedora/Debian "code" packages are often Code - OSS
     try:
         bin_dir = os.path.dirname(os.path.realpath(cli_path))
         candidates = [os.path.join(bin_dir, rel) for rel in PRODUCT_JSON_RELATIVE]
-        # Wrapper scripts (e.g. /usr/bin/code) live far from the app: try common install roots
         candidates += [os.path.join(r, "resources/app/product.json") for r in KNOWN_APP_ROOTS]
         for cand in candidates:
             if not os.path.isfile(cand):
                 continue
             with open(cand, "r", encoding="utf-8") as f:
                 product = json.load(f)
-            if product.get("applicationName") not in ide["cli"] + [cli_cmd]:
+            if product.get("applicationName") not in allowed:
                 continue
             url = (product.get("extensionsGallery") or {}).get("serviceUrl", "")
             if "open-vsx" in url:
@@ -198,13 +338,29 @@ def detect_marketplace(ide, cli_cmd, cli_path):
     return default
 
 
+def parse_editor_version(text):
+    m = re.search(r"(\d+)\.(\d+)\.(\d+)", text or "")
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
+def get_editor_version(ide):
+    if not ide.get("cli_path"):
+        return None
+    try:
+        res = run_cli(ide, ["--version"], timeout=30)
+        if res.returncode == 0:
+            return parse_editor_version(res.stdout.splitlines()[0] if res.stdout else "")
+    except Exception:
+        pass
+    return None
+
+
 def detect_vscode_ides():
     """Return the VS Code family editors found on this machine."""
     found = []
-    base = app_data_dir()
     for ide in VSCODE_FAMILY:
         cmd, path = find_cli(ide)
-        config_dir = os.path.join(base, ide["config"])
+        config_dir = find_config_dir(ide)
         if not path and not os.path.isdir(config_dir):
             continue
         item = dict(ide)
@@ -227,6 +383,16 @@ def jetbrains_roots():
     return [os.path.expanduser("~/.local/share/JetBrains"), os.path.expanduser("~/.config/JetBrains")]
 
 
+def check_intellij_plugin():
+    for base in jetbrains_roots():
+        if os.path.exists(base):
+            for root, dirs, files in os.walk(base):
+                for d in dirs:
+                    if "checkstyle-idea" in d.lower():
+                        return True
+    return False
+
+
 def detect_intellij():
     for base in jetbrains_roots():
         if os.path.isdir(base):
@@ -236,7 +402,8 @@ def detect_intellij():
 
 
 def print_header():
-    os.system('cls' if IS_WIN else 'clear')
+    if sys.stdout.isatty():
+        os.system('cls' if IS_WIN else 'clear')
     print(f"{COLOR_TITLE}┌────────────────────────────────────────────────────────┐")
     print(f"│              {COLOR_ACCENT}Arieslinter Auto-Installer 🚀              {COLOR_TITLE}│")
     print(f"│     Real-Time Static Analysis for Java Test Smells     │")
@@ -268,25 +435,27 @@ def get_vscode_profile(ide, project_path):
     return None
 
 
-def run_cli(ide, extra_args, capture_text=True):
-    """Run the IDE CLI. Uses shell on Windows because the CLI is a .cmd wrapper."""
-    args = [ide["cli_cmd"]] + extra_args
-    if IS_WIN:
-        cmd = subprocess.list2cmdline(args)
-        return subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=capture_text)
-    return subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=capture_text)
+def valid_profile(name):
+    """Profile names come from files we do not control: only pass harmless ones to the CLI."""
+    return bool(name) and bool(PROFILE_RE.match(name)) and not name.startswith("-")
+
+
+def run_cli(ide, extra_args, timeout=180):
+    """Run the IDE CLI by absolute path, never through a shell."""
+    return subprocess.run([ide["cli_path"]] + extra_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, timeout=timeout)
 
 
 def check_vscode_extensions(ide, profile_name=None):
     """Return the required extensions that are missing for this IDE."""
     missing = dict(ide["required"])
     installed = set()
-    if ide.get("cli_cmd"):
+    if ide.get("cli_path"):
         try:
             extra = ["--list-extensions"]
             if profile_name:
                 extra += ["--profile", profile_name]
-            res = run_cli(ide, extra)
+            res = run_cli(ide, extra, timeout=60)
             if res.returncode == 0:
                 installed = {l.strip().lower() for l in res.stdout.splitlines() if l.strip()}
         except Exception:
@@ -312,34 +481,41 @@ def check_vscode_extensions(ide, profile_name=None):
 
 
 def get_disabled_vscode_extensions(ide):
+    """Return the set of disabled extension ids, or None if the state could not be read."""
     disabled = set()
     base = ide.get("config_dir")
     if not base or not os.path.exists(base):
         return disabled
     try:
         import sqlite3
-        db_paths = [os.path.join(base, "User", "globalStorage", "state.vscdb")]
-        profiles_dir = os.path.join(base, "User", "profiles")
+    except ImportError:
+        return None
+    db_paths = [os.path.join(base, "User", "globalStorage", "state.vscdb")]
+    profiles_dir = os.path.join(base, "User", "profiles")
+    try:
         if os.path.isdir(profiles_dir):
             for entry in os.listdir(profiles_dir):
                 p_dir = os.path.join(profiles_dir, entry)
                 if os.path.isdir(p_dir):
                     db_paths.append(os.path.join(p_dir, "globalStorage", "state.vscdb"))
-        for db_path in db_paths:
-            if not os.path.exists(db_path):
-                continue
+    except OSError:
+        return None
+    for db_path in db_paths:
+        if not os.path.exists(db_path):
+            continue
+        try:
+            # read-only so we never touch a database the editor may have open
+            conn = sqlite3.connect(Path(db_path).as_uri() + "?mode=ro", uri=True)
             try:
-                conn = sqlite3.connect(db_path)
                 row = conn.execute("SELECT value FROM ItemTable WHERE key = 'extensionsIdentifiers/disabled'").fetchone()
-                if row:
-                    for item in json.loads(row[0]):
-                        if item.get("id"):
-                            disabled.add(item["id"].lower())
+            finally:
                 conn.close()
-            except Exception:
-                pass
-    except Exception:
-        pass
+            if row:
+                for item in json.loads(row[0]):
+                    if item.get("id"):
+                        disabled.add(item["id"].lower())
+        except Exception:
+            return None
     return disabled
 
 
@@ -360,24 +536,27 @@ def print_disabled_extensions_warning(ide_name, installed_disabled):
 def install_vscode_extensions(ide, extensions_to_install, profile_name=None):
     installed_any = False
     remaining = dict(extensions_to_install)
-    if not ide.get("cli_cmd"):
-        print(f"{COLOR_WARN}{WARN} No '{ide['cli'][0]}' command found in PATH for {ide['name']}; cannot install automatically.{COLOR_RESET}")
-    else:
-        for ext_id, ext_name in list(remaining.items()):
-            print(f"{COLOR_INFO}{INFO} Installing {ext_name} on {ide['name']} via {ide['cli_cmd']}...{COLOR_RESET}")
-            extra = ["--install-extension", ext_id]
-            if profile_name:
-                extra += ["--profile", profile_name]
-            res = run_cli(ide, extra)
-            if res.returncode == 0:
-                print(f"{COLOR_SUCCESS}{OK} {ext_name} installed successfully.{COLOR_RESET}")
-                remaining.pop(ext_id, None)
-                installed_any = True
-            else:
-                print(f"{COLOR_ERROR}{ERR} Failed to install {ext_name} on {ide['name']}.{COLOR_RESET}")
-                err = (res.stderr or res.stdout or "").strip()
-                if err:
-                    print(f"{COLOR_MUTED}      {err.splitlines()[-1]}{COLOR_RESET}")
+    for ext_id, ext_name in list(remaining.items()):
+        print(f"{COLOR_INFO}{INFO} Installing {ext_name} on {ide['name']}...{COLOR_RESET}")
+        extra = ["--install-extension", ext_id]
+        if profile_name:
+            extra += ["--profile", profile_name]
+        try:
+            res = run_cli(ide, extra, timeout=180)
+        except subprocess.TimeoutExpired:
+            print(f"{COLOR_ERROR}{ERR} Timed out installing {ext_name} (3 min). Check your network/proxy access to the marketplace.{COLOR_RESET}")
+            continue
+        if res.returncode == 0:
+            print(f"{COLOR_SUCCESS}{OK} {ext_name} installed successfully.{COLOR_RESET}")
+            remaining.pop(ext_id, None)
+            installed_any = True
+        else:
+            print(f"{COLOR_ERROR}{ERR} Failed to install {ext_name} on {ide['name']}.{COLOR_RESET}")
+            err = sanitize((res.stderr or res.stdout or "").strip())
+            if err:
+                print(f"{COLOR_MUTED}      {err.splitlines()[-1]}{COLOR_RESET}")
+            if "compatible" in err.lower():
+                print(f"{COLOR_WARN}      This extension needs a newer editor version: update {ide['name']} and run the installer again.{COLOR_RESET}")
     if remaining:
         print(f"{COLOR_WARN}{WARN} Please install manually in {ide['name']}:{COLOR_RESET}")
         for ext_id, ext_name in remaining.items():
@@ -385,53 +564,9 @@ def install_vscode_extensions(ide, extensions_to_install, profile_name=None):
     return installed_any
 
 
-def check_intellij_plugin():
-    for base in jetbrains_roots():
-        if os.path.exists(base):
-            for root, dirs, files in os.walk(base):
-                for d in dirs:
-                    if "checkstyle-idea" in d.lower():
-                        return True
-    return False
-
-
-# ---------------------------------------------------------------------------
-# Honest reporting: every step records its real outcome here
-# ---------------------------------------------------------------------------
-REPORT = []   # list of (status, label, detail) where status is ok | warn | fail
-
-
-def report(status, label, detail=""):
-    REPORT.append((status, label, detail))
-
-
-def aries_home():
-    return os.environ.get("ARIESLINTER_HOME") or os.path.expanduser(os.path.join("~", ".arieslinter"))
-
-
-def aries_jar_path():
-    if os.environ.get("ARIESLINTER_HOME"):
-        return os.path.join(aries_home(), "arieslinter.jar")
-    return os.path.expanduser(os.path.join("~", ".m2", "repository", "br", "ufba", "arieslinter", "1.0", "arieslinter-1.0.jar"))
-
-
-def checkstyle_jar_path():
-    return os.path.join(aries_home(), f"checkstyle-{CHECKSTYLE_VERSION}-all.jar")
-
-
 # ---------------------------------------------------------------------------
 # Java
 # ---------------------------------------------------------------------------
-def find_java():
-    """Return the java executable to use (JAVA_HOME first, then PATH) or None."""
-    java_home = os.environ.get("JAVA_HOME")
-    if java_home:
-        cand = os.path.join(java_home, "bin", "java.exe" if IS_WIN else "java")
-        if os.path.isfile(cand):
-            return cand
-    return shutil.which("java")
-
-
 def parse_java_major(version_output):
     """'openjdk version "17.0.1"' -> 17 ; '"1.8.0_292"' -> 8 ; '"11"' -> 11. None if unknown."""
     m = re.search(r'version "(\d+)(?:\.(\d+))?', version_output or "")
@@ -443,39 +578,127 @@ def parse_java_major(version_output):
     return major
 
 
+def java_candidates():
+    """Candidate java executables, in order of preference."""
+    java_name = "java.exe" if IS_WIN else "java"
+    cands = []
+    java_home = os.environ.get("JAVA_HOME")
+    if java_home:
+        cands.append(os.path.join(java_home, "bin", java_name))
+    on_path = safe_which("java")
+    if on_path:
+        cands.append(on_path)
+    if IS_MAC and os.path.exists("/usr/libexec/java_home"):
+        try:
+            res = subprocess.run(["/usr/libexec/java_home"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                 text=True, timeout=15)
+            home = res.stdout.strip()
+            if res.returncode == 0 and home:
+                cands.append(os.path.join(home, "bin", "java"))
+        except Exception:
+            pass
+    seen, unique = set(), []
+    for c in cands:
+        if c not in seen and os.path.isfile(c):
+            seen.add(c)
+            unique.append(c)
+    return unique
+
+
+def probe_java(java):
+    """Return the major version of a working java, or None if it does not run
+    (e.g. the macOS /usr/bin/java stub when no JDK is installed)."""
+    try:
+        res = subprocess.run([java, "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                             text=True, timeout=30)
+    except Exception:
+        return None
+    if res.returncode != 0:
+        return None
+    return parse_java_major(res.stderr + res.stdout)
+
+
 def check_java():
-    java = find_java()
-    if not java:
-        print(f"{COLOR_ERROR}{ERR} Java was NOT found (PATH/JAVA_HOME). Install JDK/JRE {MIN_JAVA}+ .{COLOR_RESET}")
+    cands = java_candidates()
+    if not cands:
+        print(f"{COLOR_ERROR}{ERR} Java was NOT found (PATH/JAVA_HOME). Install JDK/JRE {MIN_JAVA}+.{COLOR_RESET}")
         report("fail", "Java", f"not found; install Java {MIN_JAVA} or newer")
         return None
-    try:
-        res = subprocess.run([java, "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
-        major = parse_java_major(res.stderr + res.stdout)
-    except Exception as e:
-        print(f"{COLOR_ERROR}{ERR} Could not run '{java} -version': {e}{COLOR_RESET}")
-        report("fail", "Java", f"could not run {java}")
-        return None
-    if major is None:
-        print(f"{COLOR_WARN}{WARN} Could not determine the Java version of {java}.{COLOR_RESET}")
-        report("warn", "Java", "version could not be determined")
-        return java
-    if major < MIN_JAVA:
+    found = []
+    for java in cands:
+        major = probe_java(java)
+        if major is None:
+            continue
+        if major >= MIN_JAVA:
+            print(f"{COLOR_SUCCESS}{OK} Java {major} found ({java}).{COLOR_RESET}")
+            report("ok", "Java", f"version {major}")
+            return java
+        found.append((major, java))
+    if found:
+        major = max(found)[0]
         print(f"{COLOR_ERROR}{ERR} Java {major} found, but Arieslinter needs Java {MIN_JAVA}+ (Checkstyle {CHECKSTYLE_VERSION}).{COLOR_RESET}")
         report("fail", "Java", f"version {major} is too old (need {MIN_JAVA}+)")
-        return None
-    print(f"{COLOR_SUCCESS}{OK} Java {major} found ({java}).{COLOR_RESET}")
-    report("ok", "Java", f"version {major}")
-    return java
+    else:
+        print(f"{COLOR_ERROR}{ERR} A 'java' command exists but does not run (on macOS this is usually the stub with no JDK installed). Install JDK {MIN_JAVA}+.{COLOR_RESET}")
+        report("fail", "Java", "the 'java' command does not run; no usable JDK installed")
+    return None
 
 
 # ---------------------------------------------------------------------------
-# Downloads (with SHA-256 verification)
+# Downloads (pinned URL, SHA-256 required, GitHub hosts only)
 # ---------------------------------------------------------------------------
-def http_get(url, timeout=60):
-    req = urllib.request.Request(url, headers={'User-Agent': 'arieslinter-installer'})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read()
+def check_url(url):
+    p = urllib.parse.urlparse(url)
+    host = (p.hostname or "").lower()
+    if p.scheme != "https" or not any(host == h or host.endswith("." + h) for h in ALLOWED_HOSTS):
+        raise ValueError(f"refusing to download from untrusted URL: {sanitize(url)}")
+
+
+class _SafeRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        check_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def _curl_get(url, timeout):
+    curl = safe_which("curl")
+    if not curl:
+        raise RuntimeError("curl not available")
+    res = subprocess.run([curl, "-fsSL", "--proto", "=https", "--proto-redir", "=https",
+                          "--max-time", str(timeout), url],
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=timeout + 15)
+    if res.returncode != 0:
+        raise RuntimeError(f"curl exit {res.returncode}: {sanitize(res.stderr.decode(errors='replace')[:200])}")
+    return res.stdout
+
+
+def http_get(url, timeout=120, attempts=3):
+    check_url(url)
+    opener = urllib.request.build_opener(_SafeRedirect)
+    last = None
+    for i in range(attempts):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "arieslinter-installer"})
+            with opener.open(req, timeout=timeout) as resp:
+                return resp.read()
+        except urllib.error.HTTPError as e:
+            if e.code < 500 and e.code != 429:
+                raise
+            last = e
+        except (urllib.error.URLError, OSError) as e:
+            reason = getattr(e, "reason", e)
+            if isinstance(reason, ssl.SSLError):
+                # Common on macOS python.org builds and behind TLS-inspecting proxies.
+                try:
+                    return _curl_get(url, timeout)
+                except Exception as ce:
+                    raise RuntimeError(
+                        f"TLS verification failed ({sanitize(reason)}) and the curl fallback failed ({sanitize(ce)}). "
+                        "On macOS run 'Install Certificates.command' from your Python folder; behind a corporate "
+                        "proxy set SSL_CERT_FILE to your CA bundle.") from e
+            last = e
+        time.sleep(2 ** i)
+    raise last
 
 
 def sha256_file(path):
@@ -486,58 +709,73 @@ def sha256_file(path):
     return h.hexdigest()
 
 
-def download_verified(url, target, expected_sha256=None):
-    """Download to target atomically. Reuses an existing file whose hash matches.
-    Returns (ok, detail)."""
-    if expected_sha256 and os.path.isfile(target) and sha256_file(target) == expected_sha256:
-        return True, "already present, checksum OK"
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    tmp = target + ".part"
+def download_verified(url, target, expected_sha256):
+    """Download to target atomically; the SHA-256 is mandatory (fail closed).
+    Reuses an existing file whose hash matches. Returns (ok, detail)."""
+    if not expected_sha256:
+        return False, "no pinned checksum; refusing to install an unverified file"
     try:
-        data = http_get(url, timeout=120)
-        with open(tmp, "wb") as f:
-            f.write(data)
+        if os.path.isfile(target) and not os.path.islink(target) and sha256_file(target) == expected_sha256:
+            return True, "already present, checksum OK"
+        ensure_safe_dir(os.path.dirname(target))
+        if os.path.islink(target):
+            return False, f"refusing to overwrite symlink {target}"
+        data = http_get(url)
         got = hashlib.sha256(data).hexdigest()
-        if expected_sha256 and got != expected_sha256:
-            os.remove(tmp)
-            return False, f"checksum mismatch (expected {expected_sha256[:12]}..., got {got[:12]}...)"
-        os.replace(tmp, target)
-        return True, "downloaded, checksum OK" if expected_sha256 else "downloaded (no checksum published)"
-    except Exception as e:
+        if got != expected_sha256:
+            return False, f"checksum mismatch (expected {expected_sha256[:12]}..., got {got[:12]}...); file discarded"
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(target), prefix=".dl-", suffix=".part")
         try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        return False, str(e)
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+            os.chmod(tmp, 0o644)
+            for attempt in range(3):
+                try:
+                    os.replace(tmp, target)
+                    break
+                except PermissionError:
+                    if attempt == 2:
+                        return False, ("access denied replacing the file; close your IDE or exclude the folder "
+                                       "from your antivirus, then run again")
+                    time.sleep(1)
+        finally:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        return True, "downloaded, checksum OK"
+    except urllib.error.HTTPError as e:
+        hint = " (GitHub rate limit; wait a while or try another network)" if e.code in (403, 429) else ""
+        return False, f"HTTP {e.code}{hint}"
+    except Exception as e:
+        return False, sanitize(e)
+
+
+def aries_home():
+    return os.environ.get("ARIESLINTER_HOME") or os.path.expanduser(os.path.join("~", ".arieslinter"))
+
+
+def aries_jar_path():
+    return os.path.join(aries_home(), ARIES_JAR_NAME)
+
+
+def checkstyle_jar_path():
+    return os.path.join(aries_home(), f"checkstyle-{CHECKSTYLE_VERSION}-all.jar")
 
 
 def download_arieslinter_jar(target):
-    print(f"{COLOR_INFO}{INFO} Fetching latest Arieslinter release from GitHub...{COLOR_RESET}")
-    try:
-        data = json.loads(http_get("https://api.github.com/repos/viRafael/arieslinter/releases/latest").decode("utf-8"))
-        asset = next((a for a in data.get("assets", []) if a.get("name", "").endswith(".jar")), None)
-        if not asset:
-            raise RuntimeError("no .jar asset in the latest GitHub release")
-        digest = (asset.get("digest") or "")
-        sha = digest.split(":", 1)[1] if digest.startswith("sha256:") else None
-        print(f"{COLOR_INFO}{INFO} Downloading {asset['name']} ({data.get('tag_name')})...{COLOR_RESET}")
-        ok, detail = download_verified(asset["browser_download_url"], target, sha)
-    except Exception as e:
-        ok, detail = False, str(e)
+    print(f"{COLOR_INFO}{INFO} Downloading {ARIES_JAR_NAME} (release {ARIES_TAG}, pinned checksum)...{COLOR_RESET}")
+    ok, detail = download_verified(ARIES_JAR_URL, target, ARIES_SHA256)
     if ok:
         print(f"{COLOR_SUCCESS}{OK} Arieslinter JAR: {target} ({detail}){COLOR_RESET}")
         report("ok", "Arieslinter JAR", detail)
     else:
-        print(f"{COLOR_ERROR}{ERR} Arieslinter JAR download failed: {detail}{COLOR_RESET}")
+        print(f"{COLOR_ERROR}{ERR} Arieslinter JAR failed: {detail}{COLOR_RESET}")
         report("fail", "Arieslinter JAR", detail)
     return ok
 
 
 def download_checkstyle_jar(target):
-    url = (f"https://github.com/checkstyle/checkstyle/releases/download/"
-           f"checkstyle-{CHECKSTYLE_VERSION}/checkstyle-{CHECKSTYLE_VERSION}-all.jar")
     print(f"{COLOR_INFO}{INFO} Checkstyle {CHECKSTYLE_VERSION} (used for the verification step)...{COLOR_RESET}")
-    ok, detail = download_verified(url, target, CHECKSTYLE_SHA256)
+    ok, detail = download_verified(CHECKSTYLE_JAR_URL, target, CHECKSTYLE_SHA256)
     if ok:
         print(f"{COLOR_SUCCESS}{OK} Checkstyle JAR: {target} ({detail}){COLOR_RESET}")
         report("ok", f"Checkstyle {CHECKSTYLE_VERSION} JAR", detail)
@@ -589,14 +827,15 @@ def smoke_test(java, aries_jar, cs_jar):
             print(f"{COLOR_SUCCESS}{OK} Verified: Arieslinter detected the expected test smells ({', '.join(SMOKE_EXPECTED)}).{COLOR_RESET}")
             report("ok", "Verification (CLI)", "Arieslinter detected the sample test smells")
             return True
-        first_error = next((l for l in out.splitlines() if "Exception" in l or "Error" in l or "Unable" in l), out.strip()[:200])
+        first_error = sanitize(next((l for l in out.splitlines() if "Exception" in l or "Error" in l or "Unable" in l),
+                                    out.strip()[:200]))
         print(f"{COLOR_ERROR}{ERR} Verification FAILED. Missing detections: {', '.join(missing)}{COLOR_RESET}")
         print(f"{COLOR_MUTED}      {first_error}{COLOR_RESET}")
         report("fail", "Verification (CLI)", f"missing {', '.join(missing)}; {first_error}")
         return False
     except Exception as e:
-        print(f"{COLOR_ERROR}{ERR} Verification could not run: {e}{COLOR_RESET}")
-        report("fail", "Verification (CLI)", str(e))
+        print(f"{COLOR_ERROR}{ERR} Verification could not run: {sanitize(e)}{COLOR_RESET}")
+        report("fail", "Verification (CLI)", sanitize(e))
         return False
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -635,14 +874,19 @@ def strip_jsonc(text):
         else:
             out.append(c)
         i += 1
-    cleaned = "".join(out)
-    # trailing commas before } or ] (outside strings is enough here: strings were preserved verbatim,
-    # and a ",}" inside a string is vanishingly rare; guard anyway by only touching ", <ws> }|]")
-    return re.sub(r',(\s*[}\]])', r'\1', cleaned)
+    return re.sub(r',(\s*[}\]])', r'\1', "".join(out))
+
+
+def is_aries_jar_entry(entry):
+    return isinstance(entry, str) and re.search(r"arieslinter[^/\\]*\.jar$", entry, re.I) is not None
 
 
 def write_checkstyle_xml(proj_path, force=False, assume_yes=False):
     xml_path = os.path.join(proj_path, "checkstyle.xml")
+    if os.path.islink(xml_path):
+        print(f"{COLOR_ERROR}{ERR} checkstyle.xml is a symlink; refusing to write through it.{COLOR_RESET}")
+        report("fail", "checkstyle.xml", "is a symlink; not modified")
+        return False
     if os.path.exists(xml_path):
         with open(xml_path, "r", encoding="utf-8", errors="replace") as f:
             current = f.read()
@@ -653,119 +897,175 @@ def write_checkstyle_xml(proj_path, force=False, assume_yes=False):
         overwrite = force
         if not overwrite and not assume_yes:
             print(f"{COLOR_WARN}{WARN} A checkstyle.xml already exists and does NOT contain the Arieslinter checks.{COLOR_RESET}")
-            overwrite = input("   Overwrite it? A backup (.bak) will be kept. [y/N]: ").strip().lower() == "y"
+            overwrite = ask("   Overwrite it? A backup will be kept. [y/N]: ").strip().lower() == "y"
         if not overwrite:
             print(f"{COLOR_WARN}{WARN} Kept your checkstyle.xml. Add the Arieslinter <module> entries to it manually (see README).{COLOR_RESET}")
             report("warn", "checkstyle.xml", "existing file kept; Arieslinter checks are NOT registered in it")
             return False
-        backup = xml_path + ".bak"
-        shutil.copyfile(xml_path, backup)
-        print(f"{COLOR_INFO}{INFO} Backup saved to {backup}{COLOR_RESET}")
+        print(f"{COLOR_INFO}{INFO} Backup saved to {backup_file(xml_path)}{COLOR_RESET}")
     try:
-        with open(xml_path, "w", encoding="utf-8") as f:
-            f.write(CHECKSTYLE_XML_CONTENT)
+        write_text_safe(xml_path, CHECKSTYLE_XML_CONTENT)
         print(f"{COLOR_SUCCESS}{OK} checkstyle.xml written at the project root.{COLOR_RESET}")
         report("ok", "checkstyle.xml", "written with all Arieslinter checks")
         return True
     except Exception as e:
-        print(f"{COLOR_ERROR}{ERR} Error writing checkstyle.xml: {e}{COLOR_RESET}")
-        report("fail", "checkstyle.xml", str(e))
+        print(f"{COLOR_ERROR}{ERR} Error writing checkstyle.xml: {sanitize(e)}{COLOR_RESET}")
+        report("fail", "checkstyle.xml", sanitize(e))
         return False
+
+
+def read_settings(settings_path):
+    """Return (data, raw). Raises ValueError if the file exists but cannot be parsed."""
+    if not os.path.exists(settings_path):
+        return {}, None
+    with open(settings_path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    if not raw.strip():
+        return {}, raw
+    data = json.loads(strip_jsonc(raw))
+    if not isinstance(data, dict):
+        raise ValueError("settings.json is not a JSON object")
+    return data, raw
 
 
 def configure_vscode(project_path, jar_path):
     """Writes <project>/.vscode/settings.json (shared by VS Code and all its forks)."""
     settings_dir = os.path.join(project_path, ".vscode")
     settings_path = os.path.join(settings_dir, "settings.json")
-    os.makedirs(settings_dir, exist_ok=True)
-
-    data = {}
-    if os.path.exists(settings_path):
-        with open(settings_path, "r", encoding="utf-8") as f:
-            raw = f.read()
-        if raw.strip():
-            try:
-                data = json.loads(strip_jsonc(raw))
-                if not isinstance(data, dict):
-                    raise ValueError("settings.json is not a JSON object")
-            except Exception as e:
-                # Never overwrite a file we cannot understand
-                print(f"{COLOR_ERROR}{ERR} Could not parse .vscode/settings.json ({e}); left untouched.{COLOR_RESET}")
-                print(f"   Add these settings manually:\n"
-                      f'     "java.checkstyle.configuration": "${{workspaceFolder}}/checkstyle.xml",\n'
-                      f'     "java.checkstyle.version": "{CHECKSTYLE_VERSION}",\n'
-                      f'     "java.checkstyle.autocheck": true,\n'
-                      f'     "java.checkstyle.modules": ["{jar_path.replace(chr(92), "/")}"]')
-                report("fail", ".vscode/settings.json", "could not parse existing file; not modified")
-                return False
-        backup = settings_path + ".bak"
-        if not os.path.exists(backup):
-            shutil.copyfile(settings_path, backup)
-
-    data["java.checkstyle.configuration"] = "${workspaceFolder}/checkstyle.xml"
-    data["java.checkstyle.version"] = CHECKSTYLE_VERSION
-    data["java.checkstyle.autocheck"] = True
-
-    modules = data.get("java.checkstyle.modules", [])
-    if not isinstance(modules, list):
-        modules = []
     formatted_jar_path = jar_path.replace("\\", "/")   # forward slashes work on every OS
-    if formatted_jar_path not in modules:
-        modules.append(formatted_jar_path)
-    data["java.checkstyle.modules"] = modules
+    try:
+        ensure_safe_dir(settings_dir)
+        try:
+            data, raw = read_settings(settings_path)
+        except Exception as e:
+            # Never overwrite a file we cannot understand
+            print(f"{COLOR_ERROR}{ERR} Could not parse .vscode/settings.json ({sanitize(e)}); left untouched.{COLOR_RESET}")
+            print(f"   Add these settings manually:\n"
+                  f'     "java.checkstyle.configuration": "${{workspaceFolder}}/checkstyle.xml",\n'
+                  f'     "java.checkstyle.version": "{CHECKSTYLE_VERSION}",\n'
+                  f'     "java.checkstyle.autocheck": true,\n'
+                  f'     "java.checkstyle.modules": ["{formatted_jar_path}"]')
+            report("fail", ".vscode/settings.json", "could not parse existing file; not modified")
+            return False
 
-    with open(settings_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
-        f.write("\n")
+        data["java.checkstyle.configuration"] = "${workspaceFolder}/checkstyle.xml"
+        data["java.checkstyle.version"] = CHECKSTYLE_VERSION
+        data["java.checkstyle.autocheck"] = True
+        modules = data.get("java.checkstyle.modules", [])
+        if not isinstance(modules, list):
+            modules = []
+        modules = [m for m in modules if not is_aries_jar_entry(m)]   # drop stale Arieslinter paths
+        modules.append(formatted_jar_path)
+        data["java.checkstyle.modules"] = modules
+
+        new_text = json.dumps(data, indent=4) + "\n"
+        if raw is not None and raw != new_text:
+            print(f"{COLOR_INFO}{INFO} Backup saved to {backup_file(settings_path)}{COLOR_RESET}")
+        write_text_safe(settings_path, new_text)
+    except Exception as e:
+        print(f"{COLOR_ERROR}{ERR} Could not write .vscode/settings.json: {sanitize(e)}{COLOR_RESET}")
+        report("fail", ".vscode/settings.json", sanitize(e))
+        return False
     print(f"{COLOR_SUCCESS}{OK} .vscode/settings.json configured (VS Code and forks, Checkstyle {CHECKSTYLE_VERSION}).{COLOR_RESET}")
     report("ok", ".vscode/settings.json", f"configured; pinned Checkstyle {CHECKSTYLE_VERSION}")
-    report("warn", ".vscode/settings.json", "contains a path specific to this machine; do not commit/share it as-is")
+    report("warn", ".vscode/settings.json",
+           "holds a path specific to this machine and makes the IDE load a JAR: do not commit it, and only open projects you trust")
     return True
 
 
 def configure_intellij(project_path, jar_path):
     idea_dir = os.path.join(project_path, ".idea")
-    os.makedirs(idea_dir, exist_ok=True)
     xml_path = os.path.join(idea_dir, "checkstyle-idea.xml")
+    try:
+        ensure_safe_dir(idea_dir)
+        root = None
+        if os.path.exists(xml_path):
+            try:
+                root = ET.parse(xml_path).getroot()
+            except Exception as e:
+                print(f"{COLOR_ERROR}{ERR} Could not parse .idea/checkstyle-idea.xml ({sanitize(e)}); left untouched.{COLOR_RESET}")
+                report("fail", "IntelliJ project config", "could not parse existing .idea/checkstyle-idea.xml; not modified")
+                return False
+        if root is None:
+            root = ET.Element("project", version="4")
 
-    root = None
-    if os.path.exists(xml_path):
-        try:
-            root = ET.parse(xml_path).getroot()
-        except Exception:
-            pass
-    if root is None:
-        root = ET.Element("project", version="4")
+        component = root.find(".//component[@name='CheckStyle-IDEA']")
+        if component is None:
+            component = ET.SubElement(root, "component", name="CheckStyle-IDEA")
+        option = component.find(".//option[@name='configuration']")
+        if option is None:
+            option = ET.SubElement(component, "option", name="configuration")
+        map_elem = option.find("map")
+        if map_elem is None:
+            map_elem = ET.SubElement(option, "map")
 
-    component = root.find(".//component[@name='CheckStyle-IDEA']")
-    if component is None:
-        component = ET.SubElement(root, "component", name="CheckStyle-IDEA")
-    option = component.find(".//option[@name='configuration']")
-    if option is None:
-        option = ET.SubElement(component, "option", name="configuration")
-    map_elem = option.find("map")
-    if map_elem is None:
-        map_elem = ET.SubElement(option, "map")
+        entries = {
+            "active-configuration": "PROJECT_RELATIVE:$PROJECT_DIR$/checkstyle.xml:Arieslinter",
+            "checkstyle-version": CHECKSTYLE_VERSION,
+            "scan-before-checkin": "false",
+            "scanscope": "JavaOnly",
+            "thirdparty-classpath": jar_path.replace("\\", "/"),
+        }
+        for key, value in entries.items():
+            for entry in map_elem.findall(f"entry[@key='{key}']"):
+                map_elem.remove(entry)
+            ET.SubElement(map_elem, "entry", key=key, value=value)
 
-    entries = {
-        "active-configuration": "PROJECT_RELATIVE:$PROJECT_DIR$/checkstyle.xml:Arieslinter",
-        "checkstyle-version": CHECKSTYLE_VERSION,
-        "scan-before-checkin": "false",
-        "scanscope": "JavaOnly",
-        "thirdparty-classpath": jar_path.replace("\\", "/"),
-    }
-    for key, value in entries.items():
-        for entry in map_elem.findall(f"entry[@key='{key}']"):
-            map_elem.remove(entry)
-        ET.SubElement(map_elem, "entry", key=key, value=value)
-
-    pretty_xml = minidom.parseString(ET.tostring(root, 'utf-8')).toprettyxml(indent="  ")
-    pretty_xml = os.linesep.join([line for line in pretty_xml.splitlines() if line.strip()])
-    with open(xml_path, "w", encoding='utf-8') as f:
-        f.write(pretty_xml)
+        pretty_xml = minidom.parseString(ET.tostring(root, 'utf-8')).toprettyxml(indent="  ")
+        pretty_xml = os.linesep.join([line for line in pretty_xml.splitlines() if line.strip()])
+        if os.path.exists(xml_path):
+            print(f"{COLOR_INFO}{INFO} Backup saved to {backup_file(xml_path)}{COLOR_RESET}")
+        write_text_safe(xml_path, pretty_xml)
+    except Exception as e:
+        print(f"{COLOR_ERROR}{ERR} Could not write IntelliJ configuration: {sanitize(e)}{COLOR_RESET}")
+        report("fail", "IntelliJ project config", sanitize(e))
+        return False
     print(f"{COLOR_SUCCESS}{OK} IntelliJ CheckStyle-IDEA configured (Checkstyle {CHECKSTYLE_VERSION}).{COLOR_RESET}")
     report("ok", "IntelliJ project config", f".idea/checkstyle-idea.xml written (Checkstyle {CHECKSTYLE_VERSION})")
     report("warn", "IntelliJ", f"the CheckStyle-IDEA plugin must support Checkstyle {CHECKSTYLE_VERSION}; select it in Settings > Tools > Checkstyle if it does not load")
+    return True
+
+
+def uninstall(proj_path, purge=False):
+    """Remove what this installer added to the project (and optionally the downloaded JARs)."""
+    print(f"{COLOR_TITLE}Uninstalling Arieslinter from {proj_path}{COLOR_RESET}")
+    settings_path = os.path.join(proj_path, ".vscode", "settings.json")
+    if os.path.exists(settings_path):
+        try:
+            data, raw = read_settings(settings_path)
+            modules = [m for m in data.get("java.checkstyle.modules", []) if not is_aries_jar_entry(m)] \
+                if isinstance(data.get("java.checkstyle.modules"), list) else []
+            if "java.checkstyle.modules" in data:
+                if modules:
+                    data["java.checkstyle.modules"] = modules
+                else:
+                    data.pop("java.checkstyle.modules")
+            if data.get("java.checkstyle.configuration") == "${workspaceFolder}/checkstyle.xml":
+                data.pop("java.checkstyle.configuration")
+            if data.get("java.checkstyle.version") == CHECKSTYLE_VERSION:
+                data.pop("java.checkstyle.version")
+            print(f"{COLOR_INFO}{INFO} Backup saved to {backup_file(settings_path)}{COLOR_RESET}")
+            write_text_safe(settings_path, json.dumps(data, indent=4) + "\n")
+            print(f"{COLOR_SUCCESS}{OK} Removed Arieslinter entries from .vscode/settings.json{COLOR_RESET}")
+        except Exception as e:
+            print(f"{COLOR_ERROR}{ERR} Could not update .vscode/settings.json: {sanitize(e)}{COLOR_RESET}")
+    xml_path = os.path.join(proj_path, "checkstyle.xml")
+    if os.path.isfile(xml_path) and not os.path.islink(xml_path):
+        with open(xml_path, "r", encoding="utf-8", errors="replace") as f:
+            same = f.read() == CHECKSTYLE_XML_CONTENT
+        if same:
+            os.remove(xml_path)
+            print(f"{COLOR_SUCCESS}{OK} Removed checkstyle.xml (it was the unmodified installer copy).{COLOR_RESET}")
+        else:
+            print(f"{COLOR_WARN}{WARN} checkstyle.xml was modified; kept. Remove the br.ufba.arieslinter modules by hand.{COLOR_RESET}")
+    print(f"{COLOR_MUTED}   IntelliJ: remove the Arieslinter JAR under Settings > Tools > Checkstyle > Third-Party Checks.{COLOR_RESET}")
+    print(f"{COLOR_MUTED}   IDE extensions were left installed (they are useful for any Checkstyle setup).{COLOR_RESET}")
+    if purge:
+        home = aries_home()
+        if os.path.isdir(home) and not os.path.islink(home):
+            shutil.rmtree(home)
+            print(f"{COLOR_SUCCESS}{OK} Removed downloaded JARs in {home}{COLOR_RESET}")
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -788,7 +1088,7 @@ def choose_ides(vscode_ides, intellij, preselected=None):
         print(f"   {COLOR_WARN}{WARN} No supported IDE was detected automatically.{COLOR_RESET}")
     for i, ide in enumerate(options, 1):
         if ide["kind"] == "vscode":
-            how = ide["cli_cmd"] if ide["cli_cmd"] else "no CLI in PATH"
+            how = ide["cli_cmd"] if ide["cli_cmd"] else "no CLI found"
             mk = "Open VSX" if ide["marketplace"] == OPEN_VSX else "Microsoft Marketplace"
             print(f"   [{i}] {ide['name']}  {COLOR_MUTED}({how}; {mk}){COLOR_RESET}")
         else:
@@ -797,7 +1097,7 @@ def choose_ides(vscode_ides, intellij, preselected=None):
     print("   [a] All detected")
     print("   [0] None (just write checkstyle.xml)")
     while True:
-        ans = input("\n   Select IDE(s) (e.g. 1,3), 'a' or '0': ").strip().lower()
+        ans = ask("\n   Select IDE(s) (e.g. 1,3), 'a' or '0': ").strip().lower()
         if ans == "0":
             return []
         if ans == "a" and options:
@@ -816,8 +1116,19 @@ def prepare_vscode_ide(ide, project_path, assume_yes=False, no_install=False):
     print(f"\n{COLOR_TITLE}   → {ide['name']}{COLOR_RESET}")
     label = f"{ide['name']} extensions"
     profile_name = get_vscode_profile(ide, project_path)
+    if profile_name and not valid_profile(profile_name):
+        print(f"{COLOR_WARN}{WARN} Ignoring profile name with unusual characters: {sanitize(profile_name)}{COLOR_RESET}")
+        report("warn", label, "profile name has unusual characters; installed in the default profile instead")
+        profile_name = None
     if profile_name:
-        print(f"   {COLOR_INFO}{INFO} Active profile for this project: {COLOR_ACCENT}{profile_name}{COLOR_RESET}")
+        print(f"   {COLOR_INFO}{INFO} Active profile for this project: {COLOR_ACCENT}{sanitize(profile_name)}{COLOR_RESET}")
+
+    if ide["marketplace"] == OPEN_VSX:
+        version = get_editor_version(ide)
+        if version and version < OPEN_VSX_MIN_EDITOR:
+            need = ".".join(map(str, OPEN_VSX_MIN_EDITOR))
+            print(f"{COLOR_WARN}{WARN} {ide['name']} {'.'.join(map(str, version))} is older than {need}, required by the Open VSX Checkstyle extension.{COLOR_RESET}")
+            report("warn", f"{ide['name']} version", f"older than {need}; the Checkstyle extension may refuse to install. Update the editor")
 
     missing = check_vscode_extensions(ide, profile_name)
     if missing:
@@ -825,10 +1136,10 @@ def prepare_vscode_ide(ide, project_path, assume_yes=False, no_install=False):
         for ext_id, ext_name in missing.items():
             print(f"   - {ext_name} ({ext_id})")
         do_install = False
-        if not no_install and ide.get("cli_cmd"):
-            do_install = assume_yes or input("   Do you want to install them automatically? [y/N]: ").strip().lower() == "y"
-        elif not ide.get("cli_cmd"):
-            print(f"{COLOR_WARN}{WARN} No '{ide['cli'][0]}' command in PATH for {ide['name']}: install the extensions from its Extensions view.{COLOR_RESET}")
+        if not ide.get("cli_path"):
+            print(f"{COLOR_WARN}{WARN} No command-line launcher found for {ide['name']}: install the extensions from its Extensions view.{COLOR_RESET}")
+        elif not no_install:
+            do_install = assume_yes or ask("   Do you want to install them automatically? [y/N]: ").strip().lower() == "y"
         if do_install:
             install_vscode_extensions(ide, missing, profile_name)
             missing = check_vscode_extensions(ide, profile_name)   # verify, do not assume
@@ -839,6 +1150,10 @@ def prepare_vscode_ide(ide, project_path, assume_yes=False, no_install=False):
         return
 
     disabled = get_disabled_vscode_extensions(ide)
+    if disabled is None:
+        print(f"{COLOR_WARN}{WARN} Extensions are installed, but their enabled state could not be read.{COLOR_RESET}")
+        report("warn", label, "installed; could not verify they are enabled (check the Extensions view)")
+        return
     installed_disabled = [(i, n) for i, n in ide["required"].items() if i.lower() in disabled]
     if installed_disabled:
         print_disabled_extensions_warning(ide["name"], installed_disabled)
@@ -879,12 +1194,20 @@ def parse_args(argv=None):
                    ", ".join([i["id"] for i in VSCODE_FAMILY] + ["intellij"]) + " (skips the prompt)")
     p.add_argument("--yes", "-y", action="store_true", help="install missing IDE extensions without asking")
     p.add_argument("--no-extensions", action="store_true", help="never install IDE extensions (only check them)")
-    p.add_argument("--force-xml", action="store_true", help="overwrite an existing checkstyle.xml (a .bak is kept)")
+    p.add_argument("--force-xml", action="store_true", help="overwrite an existing checkstyle.xml (a backup is kept)")
+    p.add_argument("--uninstall", action="store_true", help="remove what this installer added to --project")
+    p.add_argument("--purge", action="store_true", help="with --uninstall, also delete the downloaded JARs")
     return p.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
+    if args.uninstall:
+        if not args.project or not os.path.isdir(args.project):
+            print(f"{COLOR_ERROR}{ERR} --uninstall needs --project pointing to an existing directory.{COLOR_RESET}")
+            return 1
+        return uninstall(os.path.abspath(os.path.expanduser(args.project)), purge=args.purge)
+
     if not (args.project and args.ide is not None):
         print_header()
 
@@ -898,7 +1221,7 @@ def main(argv=None):
             return 1
         print(f"   Project: {proj_path}")
     while not proj_path:
-        proj_path = input("   Enter the absolute path where you want to run the AriesLinter [default: current dir]: ").strip()
+        proj_path = ask("   Enter the absolute path where you want to run the AriesLinter [default: current dir]: ").strip()
         if not proj_path:
             proj_path = os.getcwd()
         proj_path = os.path.abspath(os.path.expanduser(proj_path))
@@ -973,5 +1296,10 @@ if __name__ == "__main__":
 
     try:
         sys.exit(main())
+    except NoTerminal:
+        print(f"\n{COLOR_ERROR}{ERR} No interactive terminal available for the questions.{COLOR_RESET}")
+        print("   Download the script and run it directly, or pass the answers as flags, e.g.:")
+        print("     python3 install.py --project /path/to/project --ide code --yes\n")
+        sys.exit(2)
     except (KeyboardInterrupt, EOFError):
         handle_exit()
