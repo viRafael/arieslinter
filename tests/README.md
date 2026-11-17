@@ -34,15 +34,19 @@ Resultado já obtido: os mesmos 33 achados com Checkstyle 8.45.1, 9.3, 10.0, 10.
 
 ## 2. Testes unitários do instalador
 
-`test_installer.py` testa as funções do `install.py` sem rede e sem tocar nas suas IDEs:
+`test_installer.py` testa as funções do `install.py` sem rede e sem tocar nas suas IDEs (34 testes):
 
-- leitura da versão do Java;
+- leitura da versão do Java e rejeição do stub `java` que não executa (macOS);
 - leitura de `settings.json` com comentários e vírgulas finais (JSONC);
-- mesclagem das settings, versão fixa do Checkstyle e backup;
-- recusa de sobrescrever um `settings.json` ilegível;
-- tratamento de um `checkstyle.xml` já existente (manter, sobrescrever com backup);
-- seleção de IDEs;
-- garantia de que forks do Open VSX não recebem a extensão exclusiva da Microsoft.
+- mesclagem das settings, versão fixa do Checkstyle, backup com data e troca de caminhos antigos do JAR;
+- recusa de sobrescrever arquivos ilegíveis ou symlinks (`settings.json`, `.vscode`, `checkstyle.xml`, `.idea`);
+- **download**: o SHA-256 é obrigatório e falha fechado (sem hash fixo, hash errado, symlink), sem deixar `.part`;
+- lista de hosts permitidos (somente `https` em `github.com`/`githubusercontent.com`, inclusive em redirecionamentos);
+- validação de nomes de perfil (sem `&`, `%`, `|`, `-opção`) e remoção de caracteres de controle;
+- detecção do marketplace (um `code` que é Code - OSS usa o Open VSX);
+- seleção de IDEs e erro claro quando não há terminal;
+- `--uninstall`, que remove só o que o instalador adicionou;
+- forks do Open VSX não recebem a extensão exclusiva da Microsoft.
 
 ```bash
 python3 -m unittest discover -s tests -p "test_*.py"

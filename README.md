@@ -40,7 +40,7 @@ Arieslinter currently supports **17 rules** to identify test smell patterns that
 
 ## ⚙️ Installation & Setup
 
-**Requirements:** Java **11 or newer** and one of the supported IDEs below. Arieslinter is a set of checks that runs *inside Checkstyle*, so any tool that runs Checkstyle with third-party modules can use it.
+**Requirements:** Python 3.8+ (installer only), Java **11 or newer** and one of the supported IDEs below. Arieslinter is a set of checks that runs *inside Checkstyle*, so any tool that runs Checkstyle with third-party modules can use it.
 
 | IDE | Extension / plugin used by the installer | Marketplace |
 | :--- | :--- | :--- |
@@ -56,21 +56,25 @@ Arieslinter currently supports **17 rules** to identify test smell patterns that
 
 The installer detects your IDEs, lets you choose which to configure, downloads the Arieslinter and Checkstyle JARs (SHA-256 verified), writes `checkstyle.xml`, configures the IDE, and **finishes by running Checkstyle on a sample file to prove the checks actually work**. Its final summary lists what succeeded, what only produced a warning and what failed; it exits with a non-zero code if anything failed.
 
+Download the script, **read it**, then run it. It only talks to GitHub, and every file it downloads is pinned by SHA-256.
+
 #### 🐧 Linux & macOS
 ```bash
-curl -sSL https://raw.githubusercontent.com/viRafael/arieslinter/main/install.py | python3
+curl -sSL -o install.py https://raw.githubusercontent.com/viRafael/arieslinter/main/install.py
+python3 install.py
 ```
 
-> [!NOTE]
-> The script automatically detects if standard input is a pipe (when run via `curl | python3`) and re-binds it to `/dev/tty` so you can interact with the installation menus seamlessly.
-
-#### 🪟 Windows (CMD / PowerShell)
-```cmd
-curl -sSL -o install.py https://raw.githubusercontent.com/viRafael/arieslinter/main/install.py && python install.py
+#### 🪟 Windows (PowerShell or CMD)
+```powershell
+curl.exe -sSL -o install.py https://raw.githubusercontent.com/viRafael/arieslinter/main/install.py
+py install.py
 ```
 
 > [!TIP]
-> This downloads the script locally first, then executes it normally. This is the most robust way to run Python interactively on Windows.
+> Use `curl.exe` (not `curl`): in Windows PowerShell 5.1 `curl` is an alias of `Invoke-WebRequest`. If `py` is not found, use `python` (and, if it opens the Microsoft Store, install Python from python.org).
+
+> [!NOTE]
+> To pin the installer itself to a reviewed version, replace `main` in the URL with a release tag or a commit SHA. The older `install-linux.py` / `install-win.py` links now only print these instructions.
 
 #### Non-interactive options
 ```bash
@@ -82,10 +86,12 @@ python3 install.py --project /path/to/project --ide code,cursor --yes
 | `--ide LIST` | `all`, `none` or ids: `code`, `code-insiders`, `code-oss`, `vscodium`, `cursor`, `windsurf`, `intellij`. |
 | `--yes` | Install missing IDE extensions without asking. |
 | `--no-extensions` | Never install extensions, only check them. |
-| `--force-xml` | Overwrite an existing `checkstyle.xml` (a `.bak` copy is kept). |
+| `--force-xml` | Overwrite an existing `checkstyle.xml` (a timestamped backup is kept). |
+| `--uninstall` | Remove what the installer added to `--project` (settings entries and an unmodified `checkstyle.xml`). |
+| `--purge` | With `--uninstall`, also delete the downloaded JARs in `~/.arieslinter`. |
 
 > [!NOTE]
-> All Checkstyle engines used by the IDE plugins must be the same version the JAR was built with. The installer pins **Checkstyle 10.23.1** in the IDE settings, because the extensions' own defaults differ (e.g. 9.3 for the Microsoft extension, 14.3.0 for the Open VSX one).
+> The JARs are saved in `~/.arieslinter` (override with the `ARIESLINTER_HOME` environment variable), so they never overwrite a build you installed with Maven. All Checkstyle engines used by the IDE plugins must be the same version the JAR was built with. The installer pins **Checkstyle 10.23.1** in the IDE settings, because the extensions' own defaults differ (e.g. 9.3 for the Microsoft extension, 14.3.0 for the Open VSX one).
 
 ---
 
@@ -168,6 +174,29 @@ Create a `checkstyle.xml` configuration file at the root of the project you want
 
 ---
 
+
+## ⚠️ Known limitations
+
+The detectors are static heuristics. Read [docs/LIMITATIONS.md](docs/LIMITATIONS.md) before using the results in a study, in particular:
+
+- Tests are recognised by the simple name of their annotation (`@Test`, ...). `@org.junit.Test` written fully qualified, JUnit 3 (`extends TestCase`) and TestNG are not recognised.
+- *Ignored Test* only detects JUnit 4 `@Ignore`; JUnit 5 `@Disabled` is **not** detected.
+- Several checks have known false positives (e.g. Magic Number flags `0`/`1`, Mystery Guest flags `@TempDir`).
+- The tool has 17 checks; the SBES 2025 paper describes an earlier version with 10 (see [docs/PAPER-VS-TOOL.md](docs/PAPER-VS-TOOL.md)).
+
+## 🩺 Troubleshooting
+
+| Symptom | Cause / fix |
+| :--- | :--- |
+| `Java ... does not run` (macOS) | `/usr/bin/java` is only a stub. Install a JDK 11+ (e.g. Temurin) and run again. |
+| `CERTIFICATE_VERIFY_FAILED` | macOS python.org builds: run `Install Certificates.command`. Behind a corporate proxy set `SSL_CERT_FILE`. The installer already retries with `curl`. |
+| `checksum mismatch` | The download was corrupted or tampered with; it was discarded. Try again, and open an issue if it persists. |
+| `Failed to install ... not compatible` | The Open VSX extension needs a recent editor (VS Code 1.144+ engine). Update your editor. |
+| `Unable to instantiate` / `NoClassDefFoundError` | The IDE uses a different Checkstyle version or the JAR path is wrong. Set `java.checkstyle.version` to `10.23.1` and check `java.checkstyle.modules`. |
+| `No interactive terminal available` | Run the downloaded script directly or pass `--project` and `--ide`. |
+| No warnings in the IDE | Make sure the file is a Java *test* (annotated with `@Test`), the Java extension is enabled, and `checkstyle.xml` lists the Arieslinter modules. |
+
+To remove everything: `python3 install.py --uninstall --project /path/to/project --purge`.
 
 ## 💻 Command line (any IDE or CI)
 
