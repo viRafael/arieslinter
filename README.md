@@ -40,15 +40,25 @@ Arieslinter currently supports **17 rules** to identify test smell patterns that
 
 ## ⚙️ Installation & Setup
 
-Choose one of the following methods to install and configure Arieslinter in your project:
+**Requirements:** Java **11 or newer** and one of the supported IDEs below. Arieslinter is a set of checks that runs *inside Checkstyle*, so any tool that runs Checkstyle with third-party modules can use it.
+
+| IDE | Extension / plugin used by the installer | Marketplace |
+| :--- | :--- | :--- |
+| VS Code, VS Code Insiders | [Checkstyle for Java](https://marketplace.visualstudio.com/items?itemName=shengchen.vscode-checkstyle) (`shengchen.vscode-checkstyle`) | Microsoft |
+| Code - OSS, VSCodium, Cursor, Windsurf | [Checkstyle for VS Code](https://open-vsx.org/extension/a-st/checkstyle-vscode) (`a-st.checkstyle-vscode`) | Open VSX |
+| IntelliJ IDEA | [CheckStyle-IDEA](https://plugins.jetbrains.com/plugin/1065-checkstyle-idea) | JetBrains |
+| Any other / CI | Checkstyle command line (see [Command line](#-command-line-any-ide-or-ci)) | - |
+
+> [!IMPORTANT]
+> The Microsoft extension `shengchen.vscode-checkstyle` is **not published on Open VSX**, so Code - OSS, VSCodium and similar editors cannot install it. The installer picks the right extension for each editor. Both extensions use the same `java.checkstyle.*` settings. Note: the Open VSX extension's own README currently asks for a recent JDK (25) to run inside the editor, while the command line and the Microsoft extension work with Java 11+.
 
 ### 🚀 Option 1: Quick Automated Install (Recommended)
 
-Run the appropriate command in your terminal to automatically check your environment, install necessary IDE plugins (Checkstyle + Java support), download the rules JAR, write the `checkstyle.xml` file, and configure your IDE workspace settings:
+The installer detects your IDEs, lets you choose which to configure, downloads the Arieslinter and Checkstyle JARs (SHA-256 verified), writes `checkstyle.xml`, configures the IDE, and **finishes by running Checkstyle on a sample file to prove the checks actually work**. Its final summary lists what succeeded, what only produced a warning and what failed; it exits with a non-zero code if anything failed.
 
 #### 🐧 Linux & macOS
 ```bash
-curl -sSL https://raw.githubusercontent.com/viRafael/arieslinter/main/install-linux.py | python3
+curl -sSL https://raw.githubusercontent.com/viRafael/arieslinter/main/install.py | python3
 ```
 
 > [!NOTE]
@@ -56,11 +66,26 @@ curl -sSL https://raw.githubusercontent.com/viRafael/arieslinter/main/install-li
 
 #### 🪟 Windows (CMD / PowerShell)
 ```cmd
-curl -sSL -o install-win.py https://raw.githubusercontent.com/viRafael/arieslinter/main/install-win.py && python install-win.py
+curl -sSL -o install.py https://raw.githubusercontent.com/viRafael/arieslinter/main/install.py && python install.py
 ```
 
 > [!TIP]
 > This downloads the script locally first, then executes it normally. This is the most robust way to run Python interactively on Windows.
+
+#### Non-interactive options
+```bash
+python3 install.py --project /path/to/project --ide code,cursor --yes
+```
+| Flag | Meaning |
+| :--- | :--- |
+| `--project DIR` | Project directory (skips the prompt). |
+| `--ide LIST` | `all`, `none` or ids: `code`, `code-insiders`, `code-oss`, `vscodium`, `cursor`, `windsurf`, `intellij`. |
+| `--yes` | Install missing IDE extensions without asking. |
+| `--no-extensions` | Never install extensions, only check them. |
+| `--force-xml` | Overwrite an existing `checkstyle.xml` (a `.bak` copy is kept). |
+
+> [!NOTE]
+> All Checkstyle engines used by the IDE plugins must be the same version the JAR was built with. The installer pins **Checkstyle 10.23.1** in the IDE settings, because the extensions' own defaults differ (e.g. 9.3 for the Microsoft extension, 14.3.0 for the Open VSX one).
 
 ---
 
@@ -143,6 +168,30 @@ Create a `checkstyle.xml` configuration file at the root of the project you want
 
 ---
 
+
+## 💻 Command line (any IDE or CI)
+
+Use the same engine the IDE plugins use, without any IDE:
+
+```bash
+java -cp checkstyle-10.23.1-all.jar:arieslinter-1.0.jar \
+  com.puppycrawl.tools.checkstyle.Main -c checkstyle.xml src/test
+```
+(On Windows use `;` instead of `:`.) The Checkstyle "all" JAR is available at <https://github.com/checkstyle/checkstyle/releases>.
+
+## ✅ Tests: same detection in every environment
+
+The detection is performed by the Checkstyle engine, not by the IDE plugin, so the result depends only on the Checkstyle and Java versions. `tests/` contains a corpus of test classes with known smells (JUnit 4, JUnit 5 and Java 17 syntax) and the expected findings:
+
+```bash
+python3 tests/check_corpus.py --java java \
+  --checkstyle-jar checkstyle-10.23.1-all.jar --arieslinter-jar arieslinter-1.0.jar
+python3 -m unittest discover -s tests -p "test_*.py"   # installer unit tests
+```
+
+The same 33 findings were obtained with Checkstyle 8.45.1, 9.3, 10.0, 10.12.5, 10.23.1, 11.1.0, 12.3.0, 13.0.0 and 14.3.0 on Java 11, 17 and 25.
+
+---
 
 ## 🎓 Research & Citation
 
