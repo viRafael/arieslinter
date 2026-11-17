@@ -11,7 +11,7 @@ All notable changes to this project are documented here. The format follows
 - Final verification that runs Checkstyle + Arieslinter on a sample file, and an honest summary with a non-zero exit code on failure.
 - `--uninstall`, `--purge`, `--project`, `--ide`, `--yes`, `--no-extensions`, `--force-xml` options.
 - Test corpus (`tests/`) and unit tests for the installer.
-- `SECURITY.md`, `CITATION.cff`, `NOTICE`, `docs/LIMITATIONS.md`, `docs/PAPER-VS-TOOL.md`, `docs/RELEASING.md`, issue and PR templates.
+- `SECURITY.md`, `CITATION.cff`, `NOTICE`, issue and PR templates, and a *Known limitations* section in the README.
 
 ### Changed
 - Java 11 is the minimum version (`pom.xml` compiles with `release` 11); Checkstyle is pinned to 10.23.1 in IDE settings.

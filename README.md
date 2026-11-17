@@ -177,12 +177,14 @@ Create a `checkstyle.xml` configuration file at the root of the project you want
 
 ## ⚠️ Known limitations
 
-The detectors are static heuristics. Read [docs/LIMITATIONS.md](docs/LIMITATIONS.md) before using the results in a study, in particular:
+The detectors are static heuristics. Keep these points in mind before using the results in a study:
 
 - Tests are recognised by the simple name of their annotation (`@Test`, ...). `@org.junit.Test` written fully qualified, JUnit 3 (`extends TestCase`) and TestNG are not recognised.
 - *Ignored Test* only detects JUnit 4 `@Ignore`; JUnit 5 `@Disabled` is **not** detected.
-- Several checks have known false positives (e.g. Magic Number flags `0`/`1`, Mystery Guest flags `@TempDir`).
-- The tool has 17 checks; the SBES 2025 paper describes an earlier version with 10 (see [docs/PAPER-VS-TOOL.md](docs/PAPER-VS-TOOL.md)).
+- *Verbose Test* uses a fixed threshold of 30 lines and its `max` property cannot be configured.
+- Several checks have known false positives (e.g. Magic Number flags `0`/`1`, Mystery Guest flags `@TempDir`, Assertion Roulette counts non-literal messages as missing).
+- The tool has 17 checks; the SBES 2025 paper describes an earlier version with 10 (it includes *Default Test*, which is not implemented here).
+- `tests/expected.txt` is a snapshot of the tool's own behavior, not an independent ground truth.
 
 ## 🩺 Troubleshooting
 
