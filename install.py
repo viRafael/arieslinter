@@ -64,6 +64,7 @@ CHECKSTYLE_JAR_URL = (f"https://github.com/checkstyle/checkstyle/releases/downlo
 CHECKSTYLE_SHA256 = "6c5d14f922e356808b4d92db76d172f7c1d9b582bbbb0d337b0da01ae8ac747f"
 MIN_JAVA = 11                    # minimum Java required by Checkstyle 10.x
 OPEN_VSX_MIN_EDITOR = (1, 144, 0)  # engines.vscode of a-st.checkstyle-vscode 2.0.2
+OPEN_VSX_LEGACY_MIN_EDITOR = (1, 64, 0)  # engines.vscode of ahmedsmaha.vscode-checkstyle 1.4.2
 
 ALLOWED_HOSTS = ("github.com", "githubusercontent.com")
 
@@ -135,6 +136,14 @@ EXTENSIONS_BY_MARKETPLACE = {
         "vscjava.vscode-java-pack": "Extension Pack for Java",
         "a-st.checkstyle-vscode": "Checkstyle for Java (Open VSX)",
     },
+}
+
+# Older editors (VS Code engine < 1.144, e.g. an outdated Code - OSS package) cannot install
+# a-st.checkstyle-vscode, which has only two published versions, both requiring 1.144+. The
+# ahmedsmaha extension (same code base as the Microsoft one) runs on editors from 1.64.
+OPEN_VSX_LEGACY_EXTENSIONS = {
+    "vscjava.vscode-java-pack": "Extension Pack for Java",
+    "ahmedsmaha.vscode-checkstyle": "Checkstyle for Java (Open VSX, for older editors)",
 }
 
 APP = "Contents/Resources/app/bin"
@@ -567,6 +576,7 @@ def print_disabled_extensions_warning(ide_name, installed_disabled):
 
 def install_vscode_extensions(ide, extensions_to_install, profile_name=None):
     installed_any = False
+    incompatible = []
     remaining = dict(extensions_to_install)
     for ext_id, ext_name in list(remaining.items()):
         print(f"{COLOR_INFO}{INFO} Installing {ext_name} on {ide['name']}...{COLOR_RESET}")
@@ -588,12 +598,13 @@ def install_vscode_extensions(ide, extensions_to_install, profile_name=None):
             if err:
                 print(f"{COLOR_MUTED}      {err.splitlines()[-1]}{COLOR_RESET}")
             if "compatible" in err.lower():
-                print(f"{COLOR_WARN}      This extension needs a newer editor version: update {ide['name']} and run the installer again.{COLOR_RESET}")
+                incompatible.append(ext_id)
+                print(f"{COLOR_WARN}      This extension needs a newer editor version than {ide['name']} has.{COLOR_RESET}")
     if remaining:
         print(f"{COLOR_WARN}{WARN} Please install manually in {ide['name']}:{COLOR_RESET}")
         for ext_id, ext_name in remaining.items():
             print(f"   - {ext_name} ({ext_id})")
-    return installed_any
+    return installed_any, incompatible
 
 
 # ---------------------------------------------------------------------------
@@ -1172,9 +1183,18 @@ def prepare_vscode_ide(ide, project_path, assume_yes=False, no_install=False):
     if ide["marketplace"] == OPEN_VSX:
         version = get_editor_version(ide)
         if version and version < OPEN_VSX_MIN_EDITOR:
+            have = ".".join(map(str, version))
             need = ".".join(map(str, OPEN_VSX_MIN_EDITOR))
-            print(f"{COLOR_WARN}{WARN} {ide['name']} {'.'.join(map(str, version))} is older than {need}, required by the Open VSX Checkstyle extension.{COLOR_RESET}")
-            report("warn", f"{ide['name']} version", f"older than {need}; the Checkstyle extension may refuse to install. Update the editor")
+            if version >= OPEN_VSX_LEGACY_MIN_EDITOR:
+                ide["required"] = dict(OPEN_VSX_LEGACY_EXTENSIONS)
+                print(f"{COLOR_WARN}{WARN} {ide['name']} {have} is older than {need}, which the default Open VSX Checkstyle extension needs. Using the older compatible extension instead.{COLOR_RESET}")
+                report("warn", f"{ide['name']} version",
+                       f"{have} is older than {need}; using the older Checkstyle extension (same settings, verified to give the same results). Updating the editor is recommended")
+            else:
+                need_old = ".".join(map(str, OPEN_VSX_LEGACY_MIN_EDITOR))
+                print(f"{COLOR_ERROR}{ERR} {ide['name']} {have} is too old for any Checkstyle extension (needs {need_old}+). Update the editor.{COLOR_RESET}")
+                report("fail", f"{ide['name']} version", f"{have} is too old (needs {need_old}+); update the editor")
+                return
 
     missing = check_vscode_extensions(ide, profile_name)
     if missing:
@@ -1187,7 +1207,15 @@ def prepare_vscode_ide(ide, project_path, assume_yes=False, no_install=False):
         elif not no_install:
             do_install = assume_yes or ask("   Do you want to install them automatically? [y/N]: ").strip().lower() == "y"
         if do_install:
-            install_vscode_extensions(ide, missing, profile_name)
+            _, incompatible = install_vscode_extensions(ide, missing, profile_name)
+            if incompatible and ide["marketplace"] == OPEN_VSX and "ahmedsmaha.vscode-checkstyle" not in ide["required"]:
+                # The editor said the extension is not compatible (version could not be read beforehand): retry with the older one
+                print(f"{COLOR_WARN}{WARN} Retrying with the older Checkstyle extension that supports older editors.{COLOR_RESET}")
+                ide["required"] = dict(OPEN_VSX_LEGACY_EXTENSIONS)
+                report("warn", f"{ide['name']} version", "the default Checkstyle extension is not compatible with this editor; using the older one. Updating the editor is recommended")
+                missing = check_vscode_extensions(ide, profile_name)
+                if missing:
+                    install_vscode_extensions(ide, missing, profile_name)
             missing = check_vscode_extensions(ide, profile_name)   # verify, do not assume
 
     if missing:
@@ -1207,7 +1235,7 @@ def prepare_vscode_ide(ide, project_path, assume_yes=False, no_install=False):
         return
     print(f"{COLOR_SUCCESS}{OK} Required extensions are installed and enabled in {ide['name']}.{COLOR_RESET}")
     report("ok", label, "installed and enabled (confirmed)")
-    if ide["marketplace"] == OPEN_VSX:
+    if ide["marketplace"] == OPEN_VSX and "a-st.checkstyle-vscode" in ide["required"]:
         report("warn", f"{ide['name']} Java runtime",
                "the Open VSX checkstyle extension may require a newer JDK than 11 to run inside the editor (see its README)")
 

@@ -293,6 +293,65 @@ class MenuInputTest(unittest.TestCase):
         self.assertEqual(self._run([], ["c", "nope-nope-xyz", "0"]), [])
 
 
+class OldEditorFallbackTest(unittest.TestCase):
+    """Open VSX editors older than 1.144 cannot install a-st.checkstyle-vscode."""
+
+    def _ide(self):
+        return {"id": "code-oss", "name": "Code - OSS", "kind": "vscode", "cli": ["code-oss"], "cli_cmd": "code-oss",
+                "cli_path": "/usr/bin/code-oss", "config_dir": None, "ext_dir": "",
+                "marketplace": inst.OPEN_VSX, "required": dict(inst.EXTENSIONS_BY_MARKETPLACE[inst.OPEN_VSX])}
+
+    def setUp(self):
+        inst.REPORT.clear()
+
+    def _run(self, ide, version):
+        with mock.patch.object(inst, "get_editor_version", return_value=version), \
+             mock.patch.object(inst, "get_vscode_profile", return_value=None), \
+             mock.patch.object(inst, "get_disabled_vscode_extensions", return_value=set()):
+            return inst.prepare_vscode_ide(ide, "/tmp", assume_yes=True, no_install=False)
+
+    def test_old_editor_uses_the_legacy_extension(self):
+        ide = self._ide()
+        with mock.patch.object(inst, "check_vscode_extensions", return_value={}):
+            self._run(ide, (1, 138, 0))
+        self.assertIn("ahmedsmaha.vscode-checkstyle", ide["required"])
+        self.assertNotIn("a-st.checkstyle-vscode", ide["required"])
+        self.assertTrue(any(s == "warn" and "older" in d for s, _, d in inst.REPORT))
+
+    def test_recent_editor_keeps_the_default_extension(self):
+        ide = self._ide()
+        with mock.patch.object(inst, "check_vscode_extensions", return_value={}):
+            self._run(ide, (1, 150, 0))
+        self.assertIn("a-st.checkstyle-vscode", ide["required"])
+
+    def test_very_old_editor_fails_with_clear_message(self):
+        ide = self._ide()
+        self._run(ide, (1, 50, 0))
+        self.assertEqual(inst.REPORT[-1][0], "fail")
+        self.assertIn("too old", inst.REPORT[-1][2])
+
+    def test_incompatibility_error_triggers_retry_with_legacy_extension(self):
+        ide = self._ide()
+        checks = iter([
+            {"a-st.checkstyle-vscode": "x"},            # before installing: default extension missing
+            {"ahmedsmaha.vscode-checkstyle": "y"},      # after switching: legacy missing
+            {},                                          # final verification
+        ])
+        with mock.patch.object(inst, "check_vscode_extensions", side_effect=lambda *a, **k: next(checks)), \
+             mock.patch.object(inst, "install_vscode_extensions",
+                               side_effect=[(False, ["a-st.checkstyle-vscode"]), (True, [])]) as install:
+            self._run(ide, None)          # version could not be read
+        self.assertEqual(install.call_count, 2)
+        self.assertIn("ahmedsmaha.vscode-checkstyle", ide["required"])
+        self.assertEqual([s for s, _, _ in inst.REPORT if s == "fail"], [])
+
+    def test_legacy_extension_needs_no_jdk25_warning(self):
+        ide = self._ide()
+        with mock.patch.object(inst, "check_vscode_extensions", return_value={}):
+            self._run(ide, (1, 138, 0))
+        self.assertFalse(any("Java runtime" in l for _, l, _ in inst.REPORT))
+
+
 class TableTest(unittest.TestCase):
     def test_open_vsx_forks_do_not_use_microsoft_only_extension(self):
         for ide in inst.VSCODE_FAMILY:

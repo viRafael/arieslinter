@@ -34,7 +34,7 @@ Resultado já obtido: os mesmos 33 achados com Checkstyle 8.45.1, 9.3, 10.0, 10.
 
 ## 2. Testes unitários do instalador
 
-`test_installer.py` testa as funções do `install.py` sem rede e sem tocar nas suas IDEs (43 testes):
+`test_installer.py` testa as funções do `install.py` sem rede e sem tocar nas suas IDEs (48 testes):
 
 - leitura da versão do Java e rejeição do stub `java` que não executa (macOS);
 - leitura de `settings.json` com comentários e vírgulas finais (JSONC);
@@ -47,6 +47,7 @@ Resultado já obtido: os mesmos 33 achados com Checkstyle 8.45.1, 9.3, 10.0, 10.
 - seleção de IDEs e erro claro quando não há terminal;
 - `--uninstall`, que remove só o que o instalador adicionou;
 - forks do Open VSX não recebem a extensão exclusiva da Microsoft;
+- editor antigo do Open VSX (< 1.144) escolhe a extensão compatível, com nova tentativa após erro de incompatibilidade;
 - editor personalizado (`--ide-cmd` / opção `c`) e o menu: o `a` sem IDE detectada deixa de falhar.
 
 ```bash
