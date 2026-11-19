@@ -195,7 +195,8 @@ The detectors are static heuristics. Keep these points in mind before using the 
 | `Java ... does not run` (macOS) | `/usr/bin/java` is only a stub. Install a JDK 11+ (e.g. Temurin) and run again. |
 | `CERTIFICATE_VERIFY_FAILED` | macOS python.org builds: run `Install Certificates.command`. Behind a corporate proxy set `SSL_CERT_FILE`. The installer already retries with `curl`. |
 | `checksum mismatch` | The download was corrupted or tampered with; it was discarded. Try again, and open an issue if it persists. |
-| `Failed to install ... not compatible` | The Open VSX extension needs a recent editor (VS Code 1.144+ engine). Update your editor. |
+| `Failed to install ... not compatible` | The default Open VSX extension needs an editor based on VS Code 1.144+. The installer then uses an older extension (`ahmedsmaha.vscode-checkstyle`, editors 1.64+) automatically; updating the editor is still recommended. |
+| Extension cannot download Checkstyle 10.23.1 | Set `java.checkstyle.version` to `9.3`, the version bundled with the older extension (it gives the same results on the test corpus). |
 | `Unable to instantiate` / `NoClassDefFoundError` | The IDE uses a different Checkstyle version or the JAR path is wrong. Set `java.checkstyle.version` to `10.23.1` and check `java.checkstyle.modules`. |
 | `No interactive terminal available` | Run the downloaded script directly or pass `--project` and `--ide`. |
 | No warnings in the IDE | Make sure the file is a Java *test* (annotated with `@Test`), the Java extension is enabled, and `checkstyle.xml` lists the Arieslinter modules. |
