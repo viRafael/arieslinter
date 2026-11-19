@@ -235,6 +235,64 @@ class SelectionTest(unittest.TestCase):
                 inst.choose_ides([], None, None)
 
 
+class CustomIdeTest(unittest.TestCase):
+    def _fake_cli(self, name="antigravity", ok=True):
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, name)
+        with open(path, "w") as f:
+            f.write("#!/bin/sh\n" + ('echo 1.150.0\n' if ok else "exit 3\n"))
+        os.chmod(path, 0o755)
+        return path
+
+    def test_builds_entry_from_full_path(self):
+        ide = inst.make_custom_ide(self._fake_cli())
+        self.assertEqual(ide["kind"], "vscode")
+        self.assertEqual(ide["id"], "custom")
+        self.assertEqual(ide["marketplace"], inst.OPEN_VSX)
+        self.assertIn("a-st.checkstyle-vscode", ide["required"])
+
+    def test_missing_or_broken_command_returns_none(self):
+        self.assertIsNone(inst.make_custom_ide("definitely-not-a-real-editor-xyz"))
+        self.assertIsNone(inst.make_custom_ide(self._fake_cli(ok=False)))
+        self.assertIsNone(inst.make_custom_ide(""))
+
+    def test_enabled_state_is_unknown_for_custom_editors(self):
+        ide = inst.make_custom_ide(self._fake_cli())
+        self.assertIsNone(inst.get_disabled_vscode_extensions(ide))
+
+    def test_antigravity_is_registered_with_open_vsx(self):
+        entry = next(i for i in inst.VSCODE_FAMILY if i["id"] == "antigravity")
+        self.assertEqual(entry["marketplace"], inst.OPEN_VSX)
+
+    def test_preselect_custom(self):
+        ide = inst.make_custom_ide(self._fake_cli())
+        self.assertEqual(inst.choose_ides([ide], None, "custom"), [ide])
+
+
+class MenuInputTest(unittest.TestCase):
+    def _run(self, options, answers):
+        it = iter(answers)
+        with mock.patch.object(inst, "INTERACTIVE", True), mock.patch.object(builtins, "input", lambda *_: next(it)):
+            return inst.choose_ides(options, None, None)
+
+    def test_a_with_no_ide_detected_explains_and_reprompts(self):
+        # used to be reported as "Invalid selection"; must keep asking instead of failing
+        self.assertEqual(self._run([], ["a", "0"]), [])
+
+    def test_a_selects_everything_when_ides_exist(self):
+        ides = [{"id": "code", "kind": "vscode", "cli_cmd": "code", "marketplace": inst.MICROSOFT_MARKETPLACE, "name": "VS Code"}]
+        self.assertEqual(self._run(ides, ["a"]), ides)
+
+    def test_c_adds_a_custom_editor_then_it_can_be_selected(self):
+        cli = CustomIdeTest()._fake_cli()
+        chosen = self._run([], ["c", cli, "1"])
+        self.assertEqual(len(chosen), 1)
+        self.assertEqual(chosen[0]["id"], "custom")
+
+    def test_c_with_bad_command_asks_again(self):
+        self.assertEqual(self._run([], ["c", "nope-nope-xyz", "0"]), [])
+
+
 class TableTest(unittest.TestCase):
     def test_open_vsx_forks_do_not_use_microsoft_only_extension(self):
         for ide in inst.VSCODE_FAMILY:

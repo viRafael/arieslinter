@@ -165,6 +165,12 @@ VSCODE_FAMILY = [
      "ext_dir": "~/.cursor/extensions", "marketplace": OPEN_VSX,
      "extra_cli": {"mac": [f"/Applications/Cursor.app/{APP}/cursor"],
                    "win": ["%LOCALAPPDATA%/Programs/cursor/resources/app/bin/cursor.cmd"]}},
+    # Google Antigravity (VS Code fork, Open VSX). CLI name and folders are best-effort: if they do not
+    # match your install, use the "other editor" option / --ide-cmd instead.
+    {"id": "antigravity", "name": "Antigravity", "cli": ["antigravity"], "config": "Antigravity",
+     "ext_dir": "~/.antigravity/extensions", "marketplace": OPEN_VSX,
+     "extra_cli": {"mac": [f"/Applications/Antigravity.app/{APP}/antigravity"],
+                   "win": ["%LOCALAPPDATA%/Programs/Antigravity/bin/antigravity.cmd"]}},
     {"id": "windsurf", "name": "Windsurf", "cli": ["windsurf"], "config": "Windsurf",
      "ext_dir": "~/.windsurf/extensions", "marketplace": OPEN_VSX,
      "extra_cli": {"mac": [f"/Applications/Windsurf.app/{APP}/windsurf"],
@@ -355,6 +361,30 @@ def get_editor_version(ide):
     return None
 
 
+def make_custom_ide(command):
+    """Build an IDE entry for any VS Code based editor from its CLI command or full path.
+    Returns None if the command cannot be found or does not run."""
+    if not command:
+        return None
+    command = command.strip().strip('"')
+    path = command if os.path.isfile(command) else safe_which(command)
+    if not path:
+        return None
+    name = os.path.splitext(os.path.basename(path))[0]
+    base = {"cli": [name], "marketplace": OPEN_VSX}
+    ide = {"id": "custom", "name": f"{name} (custom)", "kind": "vscode", "cli": [name],
+           "ext_dir": "", "config_dir": None, "cli_cmd": name, "cli_path": path,
+           "marketplace": detect_marketplace(base, name, path)}
+    ide["required"] = dict(EXTENSIONS_BY_MARKETPLACE[ide["marketplace"]])
+    if get_editor_version(ide) is None:
+        try:   # the command must at least answer --version
+            if run_cli(ide, ["--version"], timeout=30).returncode != 0:
+                return None
+        except Exception:
+            return None
+    return ide
+
+
 def detect_vscode_ides():
     """Return the VS Code family editors found on this machine."""
     found = []
@@ -484,7 +514,9 @@ def get_disabled_vscode_extensions(ide):
     """Return the set of disabled extension ids, or None if the state could not be read."""
     disabled = set()
     base = ide.get("config_dir")
-    if not base or not os.path.exists(base):
+    if base is None:
+        return None          # unknown location (custom editor): state cannot be verified
+    if not os.path.exists(base):
         return disabled
     try:
         import sqlite3
@@ -1094,14 +1126,28 @@ def choose_ides(vscode_ides, intellij, preselected=None):
         else:
             print(f"   [{i}] {ide['name']}")
     n = len(options)
+    print("   [c] Other VS Code based editor (you give its command)")
     print("   [a] All detected")
     print("   [0] None (just write checkstyle.xml)")
     while True:
-        ans = ask("\n   Select IDE(s) (e.g. 1,3), 'a' or '0': ").strip().lower()
+        ans = ask("\n   Select IDE(s) (e.g. 1,3), 'a', 'c' or '0': ").strip().lower()
         if ans == "0":
             return []
-        if ans == "a" and options:
-            return options
+        if ans == "c":
+            cmd = ask("   Command or full path of the editor's CLI (e.g. antigravity): ")
+            custom = make_custom_ide(cmd)
+            if custom is None:
+                print(f"   {COLOR_ERROR}{ERR} That command was not found or does not run. In the editor you can install its shell command (e.g. 'Shell Command: Install ... in PATH').{COLOR_RESET}")
+                continue
+            options.append(custom)
+            n = len(options)
+            print(f"   {COLOR_SUCCESS}{OK} Added as [{n}] {custom['name']} ({'Open VSX' if custom['marketplace'] == OPEN_VSX else 'Microsoft Marketplace'}). Now pick it (and any others).{COLOR_RESET}")
+            continue
+        if ans == "a":
+            if options:
+                return options
+            print(f"   {COLOR_WARN}{WARN} No IDE was detected, so there is nothing to select. Press 'c' to give your editor's command, or '0' to only write checkstyle.xml.{COLOR_RESET}")
+            continue
         try:
             picks = sorted({int(x) for x in re.split(r"[,\s]+", ans) if x})
             if picks and all(1 <= p <= n for p in picks):
@@ -1192,6 +1238,7 @@ def parse_args(argv=None):
     p.add_argument("--project", help="project directory (skips the prompt)")
     p.add_argument("--ide", help="comma-separated ids to configure: all, none, " +
                    ", ".join([i["id"] for i in VSCODE_FAMILY] + ["intellij"]) + " (skips the prompt)")
+    p.add_argument("--ide-cmd", help="CLI command or full path of any other VS Code based editor (selects it)")
     p.add_argument("--yes", "-y", action="store_true", help="install missing IDE extensions without asking")
     p.add_argument("--no-extensions", action="store_true", help="never install IDE extensions (only check them)")
     p.add_argument("--force-xml", action="store_true", help="overwrite an existing checkstyle.xml (a backup is kept)")
@@ -1208,7 +1255,7 @@ def main(argv=None):
             return 1
         return uninstall(os.path.abspath(os.path.expanduser(args.project)), purge=args.purge)
 
-    if not (args.project and args.ide is not None):
+    if not (args.project and (args.ide is not None or args.ide_cmd)):
         print_header()
 
     # Step 1: Target Project Configuration
@@ -1235,7 +1282,15 @@ def main(argv=None):
     java = check_java()
     vscode_ides = detect_vscode_ides()
     intellij = detect_intellij()
-    selected = choose_ides(vscode_ides, intellij, args.ide)
+    ide_choice = args.ide
+    if args.ide_cmd:
+        custom = make_custom_ide(args.ide_cmd)
+        if custom is None:
+            print(f"{COLOR_ERROR}{ERR} --ide-cmd: '{sanitize(args.ide_cmd)}' was not found or does not run.{COLOR_RESET}")
+            return 1
+        vscode_ides.append(custom)
+        ide_choice = ((ide_choice + ",") if ide_choice else "") + "custom"
+    selected = choose_ides(vscode_ides, intellij, ide_choice)
     print("")
 
     # Step 3: Download JARs
