@@ -13,6 +13,10 @@ All notable changes to this project are documented here. The format follows
 - Test corpus (`tests/`) and unit tests for the installer.
 - `SECURITY.md`, `CITATION.cff`, `NOTICE`, issue and PR templates, and a *Known limitations* section in the README.
 
+### Fixed
+- Choosing `a` when no IDE was detected was rejected as an invalid selection; the menu now explains it and offers option `c`.
+- Editors that are not in the built-in table (e.g. Antigravity) can be used through `--ide-cmd` or menu option `c`; Antigravity was also added to the table (CLI name and folders are best effort).
+
 ### Changed
 - Java 11 is the minimum version (`pom.xml` compiles with `release` 11); Checkstyle is pinned to 10.23.1 in IDE settings.
 - JARs are pinned by URL and SHA-256 and stored in `~/.arieslinter` instead of overwriting `~/.m2`.

@@ -45,8 +45,9 @@ Arieslinter currently supports **17 rules** to identify test smell patterns that
 | IDE | Extension / plugin used by the installer | Marketplace |
 | :--- | :--- | :--- |
 | VS Code, VS Code Insiders | [Checkstyle for Java](https://marketplace.visualstudio.com/items?itemName=shengchen.vscode-checkstyle) (`shengchen.vscode-checkstyle`) | Microsoft |
-| Code - OSS, VSCodium, Cursor, Windsurf | [Checkstyle for VS Code](https://open-vsx.org/extension/a-st/checkstyle-vscode) (`a-st.checkstyle-vscode`) | Open VSX |
+| Code - OSS, VSCodium, Cursor, Windsurf, Antigravity | [Checkstyle for VS Code](https://open-vsx.org/extension/a-st/checkstyle-vscode) (`a-st.checkstyle-vscode`) | Open VSX |
 | IntelliJ IDEA | [CheckStyle-IDEA](https://plugins.jetbrains.com/plugin/1065-checkstyle-idea) | JetBrains |
+| Any other VS Code based editor | Give its CLI command (menu option `c` or `--ide-cmd`); the installer uses Open VSX unless it detects the Microsoft marketplace | Open VSX |
 | Any other / CI | Checkstyle command line (see [Command line](#-command-line-any-ide-or-ci)) | - |
 
 > [!IMPORTANT]
@@ -83,7 +84,8 @@ python3 install.py --project /path/to/project --ide code,cursor --yes
 | Flag | Meaning |
 | :--- | :--- |
 | `--project DIR` | Project directory (skips the prompt). |
-| `--ide LIST` | `all`, `none` or ids: `code`, `code-insiders`, `code-oss`, `vscodium`, `cursor`, `windsurf`, `intellij`. |
+| `--ide LIST` | `all`, `none` or ids: `code`, `code-insiders`, `code-oss`, `vscodium`, `cursor`, `windsurf`, `antigravity`, `intellij`. |
+| `--ide-cmd CMD` | Any other VS Code based editor: its CLI command or full path (e.g. `--ide-cmd antigravity`). In the interactive menu use option `c`. |
 | `--yes` | Install missing IDE extensions without asking. |
 | `--no-extensions` | Never install extensions, only check them. |
 | `--force-xml` | Overwrite an existing `checkstyle.xml` (a timestamped backup is kept). |
